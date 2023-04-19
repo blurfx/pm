@@ -1,0 +1,16 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+pm
+
+*.test
+
+*.out
+
+go.work
+
+.idea
+
+.DS_Store
