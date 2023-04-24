@@ -7,10 +7,11 @@ type CommandAlias struct {
 }
 
 type commands struct {
-	Add     CommandAlias
-	CI      CommandAlias
-	Install CommandAlias
-	Run     CommandAlias
+	Add       CommandAlias
+	CI        CommandAlias
+	Install   CommandAlias
+	Uninstall CommandAlias
+	Run       CommandAlias
 }
 
 var Commands = commands{
@@ -28,6 +29,11 @@ var Commands = commands{
 		NPM:  []string{"install"},
 		Yarn: []string{"install"},
 		Pnpm: []string{"install"},
+	},
+	Uninstall: CommandAlias{
+		NPM:  []string{"uninstall"},
+		Yarn: []string{"remove"},
+		Pnpm: []string{"remove"},
 	},
 	Run: CommandAlias{
 		NPM:  []string{"run"},

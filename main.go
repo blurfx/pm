@@ -1,83 +1,129 @@
 package main
 
 import (
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 	"log"
-	"os"
 )
 
 func main() {
-	app := &cli.App{
-		Commands: []*cli.Command{
-			{
-				Name:        "add",
-				Aliases:     []string{"i", "install"},
-				Description: "Add dependency if package name is given.",
-				Usage:       "pm add <package name> ",
-				ArgsUsage:   "<package name>",
-				Action: func(ctx *cli.Context) error {
-					if ctx.Bool("frozen-lockfile") {
-						return Exec(Commands.CI)
-					}
-					if !ctx.Args().Present() {
-						log.Fatalf("pack")
-						return nil
-					}
-					if ctx.NumFlags() != 0 {
-						log.Fatalf("fuck")
-					}
-
-					return Exec(Commands.Add, ctx.Args().Slice()...)
-				},
-				Flags: []cli.Flag{
-					&cli.BoolFlag{
-						Name:    "dev",
-						Aliases: []string{"save-dev", "d", "D"},
-						Usage:   "install package as dev dependency",
-					},
-					&cli.BoolFlag{
-						Name:  "frozen-lockfile",
-						Usage: "don't generate a lockfile and fail if an update is needed",
-					},
-				},
-			},
-			{
-				Name:        "install",
-				Aliases:     []string{"i"},
-				Description: "Add dependency if package name is given. Otherwise, install the package",
-				Action: func(ctx *cli.Context) error {
-					if ctx.Bool("frozen-lockfile") {
-						return Exec(Commands.CI)
-					}
-					if ctx.Args().Present() {
-						return Exec(Commands.Add, ctx.Args().Slice()...)
-					}
-					if ctx.NumFlags() != 0 {
-						log.Fatalf("")
-					}
-
-					return Exec(Commands.Install, ctx.Args().Slice()...)
-				},
-			},
-			{
-				Name: "ci",
-				Action: func(ctx *cli.Context) error {
-					return Exec(Commands.CI)
-				},
-			},
-			{
-				Name: "run",
-				Action: func(ctx *cli.Context) error {
-					return Exec(Commands.Run, ctx.Args().Slice()...)
-				},
-			},
-		},
-		Action: func(ctx *cli.Context) error {
-			return PassThrough(ctx.Args().Slice()...)
+	var rootCmd = &cobra.Command{
+		Use:   "pm",
+		Short: "A package manager",
+		Run: func(cmd *cobra.Command, args []string) {
+			PassThrough(args...)
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	addCmd := &cobra.Command{
+		Use:     "add <package name>",
+		Aliases: []string{"i", "install"},
+		Short:   "Add dependency if package name is given.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				log.Fatalf("No package name given")
+			}
+
+			dev := GetBoolFlag(cmd, "save-dev", "dev")
+			peer := GetBoolFlag(cmd, "save-peer", "peer")
+			optional := GetBoolFlag(cmd, "save-optional", "optional")
+			global := GetBoolFlag(cmd, "global")
+			exact := GetBoolFlag(cmd, "exact")
+			frozenLockfile := GetBoolFlag(cmd, "frozen-lockfile")
+
+			if frozenLockfile {
+				Exec(Commands.CI)
+				return
+			}
+
+			var flags []flagAlias
+			if dev {
+				flags = append(flags, Flags.Dev)
+			}
+			if peer {
+				flags = append(flags, Flags.Peer)
+			}
+			if optional {
+				flags = append(flags, Flags.Optional)
+			}
+			if global {
+				flags = append(flags, Flags.Global)
+			}
+			if exact {
+				flags = append(flags, Flags.Exact)
+			}
+			ExecWithFlag(Commands.Add, flags, args...)
+		},
+	}
+
+	addCmd.Flags().BoolP("save-dev", "D", false, "install package as dev dependency")
+	addCmd.Flags().Bool("dev", false, "install package as dev dependency")
+	addCmd.Flags().MarkHidden("dev")
+	addCmd.Flags().BoolP("save-peer", "P", false, "install package as peer dependency")
+	addCmd.Flags().Bool("peer", false, "install package as peer dependency")
+	addCmd.Flags().MarkHidden("peer")
+	addCmd.Flags().BoolP("save-optional", "O", false, "install package as optional dependency")
+	addCmd.Flags().Bool("optional", false, "install package as optional dependency")
+	addCmd.Flags().MarkHidden("optional")
+	addCmd.Flags().BoolP("global", "g", false, "install package globally")
+	addCmd.Flags().BoolP("exact", "E", false, "install exact version")
+	addCmd.Flags().Bool("frozen-lockfile", false, "don't generate a lockfile and fail if an update is needed")
+
+	installCmd := &cobra.Command{
+		Use:     "install [package name]",
+		Aliases: []string{"i"},
+		Short:   "Add dependency if package name is given. Otherwise, install the package",
+		Run: func(cmd *cobra.Command, args []string) {
+			frozenLockfile, _ := cmd.Flags().GetBool("frozen-lockfile")
+
+			if frozenLockfile {
+				Exec(Commands.CI)
+				return
+			}
+
+			if len(args) > 0 {
+				addCmd.Run(cmd, args)
+			} else {
+				Exec(Commands.Install)
+			}
+		},
+	}
+
+	installCmd.Flags().Bool("frozen-lockfile", false, "don't generate a lockfile and fail if an update is needed")
+
+	uninstallCmd := &cobra.Command{
+		Use:     "uninstall <package name>",
+		Aliases: []string{"rm", "remove", "un"},
+		Short:   "Uninstall a package",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				log.Fatalf("No package name given")
+			}
+			Exec(Commands.Uninstall, args...)
+		},
+	}
+
+	ciCmd := &cobra.Command{
+		Use:   "ci",
+		Short: "CI command",
+		Run: func(cmd *cobra.Command, args []string) {
+			Exec(Commands.CI)
+		},
+	}
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run command",
+		Run: func(cmd *cobra.Command, args []string) {
+			Exec(Commands.Run, args...)
+		},
+	}
+
+	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(uninstallCmd)
+	rootCmd.AddCommand(ciCmd)
+	rootCmd.AddCommand(runCmd)
+
+	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
 }

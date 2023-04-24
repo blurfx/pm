@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 )
@@ -21,6 +22,10 @@ func PassThrough(args ...string) error {
 }
 
 func Exec(command CommandAlias, args ...string) error {
+	return ExecWithFlag(command, []flagAlias{}, args...)
+}
+
+func ExecWithFlag(command CommandAlias, flags []flagAlias, args ...string) error {
 	packageManager, err := DetectPackageManager()
 	packageCommands := map[string][]string{
 		"npm":  command.NPM,
@@ -31,7 +36,20 @@ func Exec(command CommandAlias, args ...string) error {
 		return err
 	}
 
-	cmd := exec.Command(packageManager, append(packageCommands[packageManager], args...)...)
+	flagArgs := make([]string, len(flags))
+	for i, flag := range flags {
+		if packageManager == "npm" {
+			flagArgs[i] = flag.NPM[0]
+		} else if packageManager == "yarn" {
+			flagArgs[i] = flag.Yarn[0]
+		} else if packageManager == "pnpm" {
+			flagArgs[i] = flag.Pnpm[0]
+		} else {
+			return fmt.Errorf("unknown package manager: %s", packageManager)
+		}
+	}
+
+	cmd := exec.Command(packageManager, append(packageCommands[packageManager], append(flagArgs, args...)...)...)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
