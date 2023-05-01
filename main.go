@@ -24,6 +24,8 @@ func main() {
 				log.Fatalf("No package name given")
 			}
 
+			cmd.Flags().Parse(args)
+
 			dev := GetBoolFlag(cmd, "save-dev", "dev")
 			peer := GetBoolFlag(cmd, "save-peer", "peer")
 			optional := GetBoolFlag(cmd, "save-optional", "optional")
@@ -52,8 +54,11 @@ func main() {
 			if exact {
 				flags = append(flags, Flags.Exact)
 			}
+			args = filterFlags(args, cmd.Flags())
+
 			ExecWithFlag(Commands.Add, flags, args...)
 		},
+		DisableFlagParsing: true,
 	}
 
 	addCmd.Flags().BoolP("save-dev", "D", false, "install package as dev dependency")
@@ -68,6 +73,7 @@ func main() {
 	addCmd.Flags().BoolP("global", "g", false, "install package globally")
 	addCmd.Flags().BoolP("exact", "E", false, "install exact version")
 	addCmd.Flags().Bool("frozen-lockfile", false, "don't generate a lockfile and fail if an update is needed")
+	addCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 
 	installCmd := &cobra.Command{
 		Use:     "install [package name]",
@@ -87,9 +93,11 @@ func main() {
 				Exec(Commands.Install)
 			}
 		},
+		DisableFlagParsing: true,
 	}
 
 	installCmd.Flags().Bool("frozen-lockfile", false, "don't generate a lockfile and fail if an update is needed")
+	installCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 
 	uninstallCmd := &cobra.Command{
 		Use:     "uninstall <package name>",
@@ -99,9 +107,12 @@ func main() {
 			if len(args) == 0 {
 				log.Fatalf("No package name given")
 			}
+
 			Exec(Commands.Uninstall, args...)
 		},
+		DisableFlagParsing: true,
 	}
+	uninstallCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 
 	ciCmd := &cobra.Command{
 		Use:   "ci",
@@ -110,13 +121,17 @@ func main() {
 			Exec(Commands.CI)
 		},
 	}
+	ciCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
+
 	runCmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run command",
 		Run: func(cmd *cobra.Command, args []string) {
 			Exec(Commands.Run, args...)
 		},
+		DisableFlagParsing: true,
 	}
+	runCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 
 	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(installCmd)
