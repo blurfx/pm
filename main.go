@@ -12,6 +12,7 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			PassThrough(args...)
 		},
+		Args: cobra.ArbitraryArgs,
 	}
 
 	addCmd := &cobra.Command{
