@@ -133,8 +133,8 @@ func main() {
 	}
 	runCmd.FParseErrWhitelist = cobra.FParseErrWhitelist{UnknownFlags: true}
 
-	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(uninstallCmd)
 	rootCmd.AddCommand(ciCmd)
 	rootCmd.AddCommand(runCmd)
