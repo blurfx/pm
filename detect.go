@@ -45,6 +45,10 @@ func isCommandAvailable(name string) bool {
 }
 
 func detectInstalledPackageManagers() (string, error) {
+	config := ReadConfig()
+	if isCommandAvailable(config.DefaultPackageManager) {
+		return config.DefaultPackageManager, nil
+	}
 	if isCommandAvailable("npm") {
 		return "npm", nil
 	}

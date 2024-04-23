@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/spf13/cobra"
 	"log"
+	"strings"
 )
 
 func main() {
@@ -57,6 +58,22 @@ func main() {
 			args = filterFlags(args, cmd.Flags())
 
 			ExecWithFlag(Commands.Add, flags, args...)
+
+			nonTypedPackages := []string{}
+			for _, arg := range args {
+				if !strings.HasPrefix(arg, "@types/") {
+					ok, _ := CheckPackageExists("@types/" + arg)
+					if !ok {
+						continue
+					}
+					nonTypedPackages = append(nonTypedPackages, "@types/"+arg)
+				}
+			}
+			if !dev && !peer && !optional && !global {
+				for _, packageName := range nonTypedPackages {
+					ExecWithFlag(Commands.Add, []flagAlias{Flags.Dev}, packageName)
+				}
+			}
 		},
 		DisableFlagParsing: true,
 	}
