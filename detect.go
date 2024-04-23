@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const MAX_TRAVERSE_DEPTH = 20
@@ -14,6 +16,10 @@ func fileExists(filename string) bool {
 	return !os.IsNotExist(err)
 }
 
+type packageJsonConfig struct {
+	PackageManager string `json:"packageManager"`
+}
+
 func detectPackageManager() (string, error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -21,6 +27,19 @@ func detectPackageManager() (string, error) {
 	}
 	depth := 0
 	for {
+		if fileExists("package.json") {
+			file, err := os.Open("package.json")
+			if err == nil {
+				defer file.Close()
+				var packageJson packageJsonConfig
+				decoder := json.NewDecoder(file)
+				err = decoder.Decode(&packageJson)
+				if err == nil && packageJson.PackageManager != "" {
+					return strings.Split(packageJson.PackageManager, "@")[0], nil
+				}
+			}
+		}
+
 		if fileExists("package-lock.json") {
 			return "npm", nil
 		} else if fileExists("yarn.lock") {
@@ -45,10 +64,6 @@ func isCommandAvailable(name string) bool {
 }
 
 func detectInstalledPackageManagers() (string, error) {
-	config := ReadConfig()
-	if isCommandAvailable(config.DefaultPackageManager) {
-		return config.DefaultPackageManager, nil
-	}
 	if isCommandAvailable("npm") {
 		return "npm", nil
 	}
