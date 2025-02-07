@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -12,7 +14,9 @@ func main() {
 		Short:              "A universal package manager wrapper",
 		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			PassThrough(args...)
+			if err := PassThrough(args...); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
 		},
 		Args: cobra.ArbitraryArgs,
 	}
