@@ -8,8 +8,9 @@ import (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "pm",
-		Short: "A package manager",
+		Use:                "pm",
+		Short:              "A universal package manager wrapper",
+		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			PassThrough(args...)
 		},
