@@ -29,13 +29,12 @@ func detectPackageManager() (string, error) {
 	depth := 0
 
 	for {
-		if fileExists(filepath.Join(currentDir, "pnpm-workspace.yaml")) {
-			return "pnpm", nil
-		}
-		if fileExists(filepath.Join(currentDir, "yarn.lock")) &&
-			(fileExists(filepath.Join(currentDir, "yarn-workspace.json")) ||
-				fileExists(filepath.Join(currentDir, "package.json"))) {
+		if fileExists(filepath.Join(currentDir, "package-lock.json")) {
+			return "npm", nil
+		} else if fileExists(filepath.Join(currentDir, "yarn.lock")) {
 			return "yarn", nil
+		} else if fileExists(filepath.Join(currentDir, "pnpm-lock.yaml")) {
+			return "pnpm", nil
 		}
 
 		packageJsonPath := filepath.Join(currentDir, "package.json")
@@ -50,14 +49,6 @@ func detectPackageManager() (string, error) {
 					return strings.Split(packageJson.PackageManager, "@")[0], nil
 				}
 			}
-		}
-
-		if fileExists(filepath.Join(currentDir, "package-lock.json")) {
-			return "npm", nil
-		} else if fileExists(filepath.Join(currentDir, "yarn.lock")) {
-			return "yarn", nil
-		} else if fileExists(filepath.Join(currentDir, "pnpm-lock.yaml")) {
-			return "pnpm", nil
 		}
 
 		parentDir := filepath.Dir(currentDir)
