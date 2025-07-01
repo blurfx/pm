@@ -4,6 +4,7 @@
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
 version: 2
+project_name: pm
 
 before:
   hooks:
@@ -41,9 +42,7 @@ changelog:
       - "^test:"
 
 homebrew_casks:
-  - name: pm
-    binary: pm
-    homepage: "https://github.com/blurfx/homebrew-pm"
+  - homepage: "https://github.com/blurfx/homebrew-tap"
     repository:
       owner: blurfx
-      name: homebrew-pm
+      name: homebrew-tap
