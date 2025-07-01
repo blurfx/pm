@@ -78,7 +78,7 @@ func detectInstalledPackageManagers() (string, error) {
 		return "pnpm", nil
 	}
 
-	return "", fmt.Errorf("no package manager detected")
+	return "", fmt.Errorf("no package manager detected (supported: npm, yarn, pnpm)")
 }
 
 func DetectPackageManager() (string, error) {

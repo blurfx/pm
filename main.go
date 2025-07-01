@@ -20,6 +20,17 @@ func main() {
 				fmt.Fprintln(os.Stderr, err)
 				return
 			}
+			if len(args) == 0 {
+				script, err := showScriptPrompt()
+				if err != nil {
+					if err.Error() != "cancelled" {
+						fmt.Fprintln(os.Stderr, err)
+					}
+					return
+				}
+				Exec(Commands.Run, script.Name)
+				return
+			}
 			if IsBuiltInCommand(packageManager, args...) {
 				if err := PassThrough(args...); err != nil {
 					fmt.Fprintln(os.Stderr, err)
@@ -162,7 +173,19 @@ func main() {
 		Use:   "run",
 		Short: "Run command",
 		Run: func(cmd *cobra.Command, args []string) {
-			Exec(Commands.Run, args...)
+			if len(args) == 0 {
+				// Show interactive prompt
+				script, err := showScriptPrompt()
+				if err != nil {
+					if err.Error() != "cancelled" {
+						fmt.Fprintln(os.Stderr, err)
+					}
+					return
+				}
+				Exec(Commands.Run, script.Name)
+			} else {
+				Exec(Commands.Run, args...)
+			}
 		},
 		DisableFlagParsing: true,
 	}
