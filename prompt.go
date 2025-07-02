@@ -261,7 +261,7 @@ func highlightMatch(text, query string, isSelected bool, maxLen int) string {
 
 		resetColor := resetCode
 		if isSelected {
-			resetColor = "\033[0m" + cyanCode
+			resetColor = "\033[0m" + bgDarkGrayCode + cyanCode
 		}
 
 		result := truncated[:index] + highlightColor + truncated[index:index+len(query)] + resetColor + truncated[index+len(query):]
@@ -279,7 +279,7 @@ func highlightMatch(text, query string, isSelected bool, maxLen int) string {
 
 	resetColor := resetCode
 	if isSelected {
-		resetColor = "\033[0m" + cyanCode
+		resetColor = "\033[0m" + bgDarkGrayCode + cyanCode
 	}
 
 	for textIdx < len(truncated) && queryIdx < len(lowerQuery) {
