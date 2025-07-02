@@ -12,7 +12,7 @@ func PassThrough(args ...string) error {
 		return err
 	}
 
-	cmd := exec.Command(packageManager, args...)
+	cmd := exec.Command(string(packageManager), args...)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -27,29 +27,28 @@ func Exec(command CommandAlias, args ...string) error {
 
 func ExecWithFlag(command CommandAlias, flags []flagAlias, args ...string) error {
 	packageManager, err := DetectPackageManager()
-	packageCommands := map[string][]string{
-		"npm":  command.NPM,
-		"yarn": command.Yarn,
-		"pnpm": command.Pnpm,
-	}
+
 	if err != nil {
 		return err
 	}
 
 	flagArgs := make([]string, len(flags))
 	for i, flag := range flags {
-		if packageManager == "npm" {
-			flagArgs[i] = flag.NPM[0]
-		} else if packageManager == "yarn" {
-			flagArgs[i] = flag.Yarn[0]
-		} else if packageManager == "pnpm" {
-			flagArgs[i] = flag.Pnpm[0]
-		} else {
+		switch packageManager {
+		case PackageManagerNpm:
+			flagArgs[i] = flag[PackageManagerNpm][0]
+		case PackageManagerYarn:
+			flagArgs[i] = flag[PackageManagerYarn][0]
+		case PackageManagerPnpm:
+			flagArgs[i] = flag[PackageManagerPnpm][0]
+		case PackageManagerBun:
+			flagArgs[i] = flag[PackageManagerBun][0]
+		default:
 			return fmt.Errorf("unknown package manager: %s", packageManager)
 		}
 	}
 
-	cmd := exec.Command(packageManager, append(packageCommands[packageManager], append(flagArgs, args...)...)...)
+	cmd := exec.Command(string(packageManager), append(command[packageManager], append(flagArgs, args...)...)...)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

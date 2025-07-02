@@ -1,10 +1,7 @@
 package main
 
-type CommandAlias struct {
-	NPM  []string
-	Yarn []string
-	Pnpm []string
-}
+// key is package manager
+type CommandAlias map[PackageManager][]string
 
 type commands struct {
 	Add       CommandAlias
@@ -16,28 +13,33 @@ type commands struct {
 
 var Commands = commands{
 	Add: CommandAlias{
-		NPM:  []string{"install"},
-		Yarn: []string{"add"},
-		Pnpm: []string{"add"},
+		PackageManagerNpm:  []string{"install"},
+		PackageManagerYarn: []string{"add"},
+		PackageManagerPnpm: []string{"add"},
+		PackageManagerBun:  []string{"add"},
 	},
 	CI: CommandAlias{
-		NPM:  []string{"ci"},
-		Yarn: []string{"install", "--frozen-lockfile"},
-		Pnpm: []string{"install", "--frozen-lockfile"},
+		PackageManagerNpm:  []string{"ci"},
+		PackageManagerYarn: []string{"install", "--frozen-lockfile"},
+		PackageManagerPnpm: []string{"install", "--frozen-lockfile"},
+		PackageManagerBun:  []string{"install", "--frozen-lockfile"},
 	},
 	Install: CommandAlias{
-		NPM:  []string{"install"},
-		Yarn: []string{"install"},
-		Pnpm: []string{"install"},
+		PackageManagerNpm:  []string{"install"},
+		PackageManagerYarn: []string{"install"},
+		PackageManagerPnpm: []string{"install"},
+		PackageManagerBun:  []string{"install"},
 	},
 	Uninstall: CommandAlias{
-		NPM:  []string{"uninstall"},
-		Yarn: []string{"remove"},
-		Pnpm: []string{"remove"},
+		PackageManagerNpm:  []string{"uninstall"},
+		PackageManagerYarn: []string{"remove"},
+		PackageManagerPnpm: []string{"remove"},
+		PackageManagerBun:  []string{"remove"},
 	},
 	Run: CommandAlias{
-		NPM:  []string{"run"},
-		Yarn: []string{"run"},
-		Pnpm: []string{"run"},
+		PackageManagerNpm:  []string{"run"},
+		PackageManagerYarn: []string{"run"},
+		PackageManagerPnpm: []string{"run"},
+		PackageManagerBun:  []string{"run"},
 	},
 }

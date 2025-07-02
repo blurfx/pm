@@ -243,15 +243,44 @@ var PNPM_COMMANDS = [][]string{
 	{"config"},
 }
 
-var IsBuiltInCommand = func(packageManager string, arg ...string) bool {
+var BUN_COMMANDS = [][]string{
+	{"run"},
+	{"test"},
+	{"x"},
+	{"repl"},
+	{"exec"},
+	{"install"},
+	{"i"},
+	{"add"},
+	{"a"},
+	{"remove"},
+	{"rm"},
+	{"audit"},
+	{"outdated"},
+	{"link"},
+	{"unlink"},
+	{"publish"},
+	{"patch"},
+	{"pm"},
+	{"info"},
+	{"build"},
+	{"init"},
+	{"create"},
+	{"c"},
+	{"upgrade"},
+}
+
+var IsBuiltInCommand = func(packageManager PackageManager, arg ...string) bool {
 	var commands [][]string
 	switch packageManager {
-	case "npm":
+	case PackageManagerNpm:
 		commands = NPM_COMMANDS
-	case "yarn":
+	case PackageManagerYarn:
 		commands = YARN_CLASSIC_COMMANDS
-	case "pnpm":
+	case PackageManagerPnpm:
 		commands = PNPM_COMMANDS
+	case PackageManagerBun:
+		commands = BUN_COMMANDS
 	default:
 		return false
 	}
