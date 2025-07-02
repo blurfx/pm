@@ -174,7 +174,6 @@ func main() {
 		Short: "Run command",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 0 {
-				// Show interactive prompt
 				script, err := showScriptPrompt()
 				if err != nil {
 					if err.Error() != "cancelled" {

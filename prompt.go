@@ -2,19 +2,33 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 )
 
 const (
 	// ANSI escape codes
-	clearScreenCode = "\033[2J"
-	cursorHomeCode  = "\033[H"
-	hideCursorCode  = "\033[?25l"
-	showCursorCode  = "\033[?25h"
-	clearLineCode   = "\033[K"
-	cyanCode        = "\033[36m"
-	yellowCode      = "\033[33m"
-	resetCode       = "\033[0m"
+	clearScreenCode     = "\033[2J"
+	clearScrollbackCode = "\033[3J"
+	cursorHomeCode      = "\033[H"
+	hideCursorCode      = "\033[?25l"
+	showCursorCode      = "\033[?25h"
+	clearLineCode       = "\033[K"
+	boldCode            = "\033[1m"
+	cyanCode            = "\033[36m"
+	yellowCode          = "\033[33m"
+	blueCode            = "\033[34m"
+	resetCode           = "\033[0m"
+	bgCyanCode          = "\033[46m"
+	bgBlackCode         = "\033[40m"
+	bgLightGrayCode     = "\033[47m"
+	bgDarkGrayCode      = "\033[100m"
+	// Mouse tracking
+	enableMouseCode  = "\033[?1000h\033[?1002h\033[?1006h"
+	disableMouseCode = "\033[?1000l\033[?1002l\033[?1006l"
 	// Use \r\n for proper line endings in raw mode
 	newline = "\r\n"
 )
@@ -25,6 +39,12 @@ type PromptUI struct {
 	selectedIndex   int
 	searchQuery     string
 	maxHeight       int
+	// Mouse tracking
+	scriptStartLine int // Line where scripts start being displayed
+	lastClickTime   int64
+	lastClickLine   int
+	// Scrolling state
+	viewStartIdx int // Current view window start index
 }
 
 func NewPromptUI(scripts []Script) *PromptUI {
@@ -37,47 +57,42 @@ func NewPromptUI(scripts []Script) *PromptUI {
 	return ui
 }
 
-// fuzzyMatch performs a simple fuzzy matching algorithm
-// Returns true if all characters in query appear in text in order
 func fuzzyMatch(text, query string) bool {
 	if query == "" {
 		return true
 	}
-	
+
 	textLower := strings.ToLower(text)
 	queryLower := strings.ToLower(query)
-	
+
 	textIdx := 0
 	queryIdx := 0
-	
+
 	for textIdx < len(textLower) && queryIdx < len(queryLower) {
 		if textLower[textIdx] == queryLower[queryIdx] {
 			queryIdx++
 		}
 		textIdx++
 	}
-	
+
 	return queryIdx == len(queryLower)
 }
 
-// fuzzyScore calculates a score for fuzzy matching
-// Lower score is better match
 func fuzzyScore(text, query string) int {
 	if query == "" {
 		return 0
 	}
-	
+
 	textLower := strings.ToLower(text)
 	queryLower := strings.ToLower(query)
-	
+
 	score := 0
 	textIdx := 0
 	queryIdx := 0
 	lastMatchIdx := -1
-	
+
 	for textIdx < len(textLower) && queryIdx < len(queryLower) {
 		if textLower[textIdx] == queryLower[queryIdx] {
-			// Add gap penalty
 			if lastMatchIdx != -1 {
 				score += textIdx - lastMatchIdx
 			}
@@ -86,22 +101,19 @@ func fuzzyScore(text, query string) int {
 		}
 		textIdx++
 	}
-	
-	// Penalize if not all characters matched
+
 	if queryIdx < len(queryLower) {
 		return 999999
 	}
-	
-	// Bonus for exact match
+
 	if strings.Contains(textLower, queryLower) {
 		score -= 100
 	}
-	
-	// Bonus for matching at start
+
 	if strings.HasPrefix(textLower, queryLower) {
 		score -= 200
 	}
-	
+
 	return score
 }
 
@@ -119,20 +131,14 @@ func (ui *PromptUI) filterScripts() {
 	scored := make([]scoredScript, 0)
 
 	for _, script := range ui.scripts {
-		// Check both name and command
 		nameMatch := fuzzyMatch(script.Name, ui.searchQuery)
 		cmdMatch := fuzzyMatch(script.Command, ui.searchQuery)
-		
+
 		if nameMatch || cmdMatch {
-			// Calculate best score between name and command
 			nameScore := fuzzyScore(script.Name, ui.searchQuery)
 			cmdScore := fuzzyScore(script.Command, ui.searchQuery)
-			
-			bestScore := nameScore
-			if cmdScore < bestScore {
-				bestScore = cmdScore
-			}
-			
+			bestScore := min(nameScore, cmdScore)
+
 			scored = append(scored, scoredScript{
 				script: script,
 				score:  bestScore,
@@ -140,7 +146,6 @@ func (ui *PromptUI) filterScripts() {
 		}
 	}
 
-	// Sort by score (better matches first)
 	for i := 0; i < len(scored); i++ {
 		for j := i + 1; j < len(scored); j++ {
 			if scored[j].score < scored[i].score {
@@ -149,19 +154,19 @@ func (ui *PromptUI) filterScripts() {
 		}
 	}
 
-	// Extract sorted scripts
 	ui.filteredScripts = make([]Script, len(scored))
 	for i, s := range scored {
 		ui.filteredScripts[i] = s.script
 	}
 
-	// Reset selected index if it's out of bounds
 	if ui.selectedIndex >= len(ui.filteredScripts) {
 		ui.selectedIndex = len(ui.filteredScripts) - 1
 		if ui.selectedIndex < 0 {
 			ui.selectedIndex = 0
 		}
 	}
+
+	ui.viewStartIdx = 0
 }
 
 func (ui *PromptUI) moveUp() {
@@ -183,7 +188,6 @@ func (ui *PromptUI) handleSearchInput(key []byte) {
 			ui.filterScripts()
 		}
 	} else if len(key) == 1 && key[0] >= 32 && key[0] <= 126 {
-		// Printable character
 		ui.searchQuery += string(key)
 		ui.filterScripts()
 	}
@@ -196,7 +200,38 @@ func (ui *PromptUI) getSelectedScript() *Script {
 	return &ui.filteredScripts[ui.selectedIndex]
 }
 
-// truncateText truncates text to maxLen and adds ellipsis if needed
+func (ui *PromptUI) handleMouseEvent(event *MouseEvent, startIdx, endIdx int) bool {
+	switch event.Type {
+	case "click":
+		clickedLine := event.Y - ui.scriptStartLine
+		clickedIndex := startIdx + clickedLine
+
+		if clickedIndex >= startIdx && clickedIndex < endIdx && clickedIndex < len(ui.filteredScripts) {
+			now := time.Now().UnixMilli()
+			if ui.lastClickLine == event.Y && now-ui.lastClickTime < 500 {
+				ui.selectedIndex = clickedIndex
+				return true
+			}
+
+			ui.selectedIndex = clickedIndex
+			ui.lastClickTime = now
+			ui.lastClickLine = event.Y
+		}
+
+	case "scroll_up":
+		if ui.selectedIndex > 0 {
+			ui.selectedIndex--
+		}
+
+	case "scroll_down":
+		if ui.selectedIndex < len(ui.filteredScripts)-1 {
+			ui.selectedIndex++
+		}
+	}
+
+	return false
+}
+
 func truncateText(text string, maxLen int) string {
 	if len(text) <= maxLen {
 		return text
@@ -207,53 +242,46 @@ func truncateText(text string, maxLen int) string {
 	return text[:maxLen-3] + "..."
 }
 
-// highlightMatch highlights the matching part of text based on the query
-// and truncates the text if needed
 func highlightMatch(text, query string, isSelected bool, maxLen int) string {
-	// First truncate the text
 	truncated := truncateText(text, maxLen)
 
 	if query == "" {
 		return truncated
 	}
 
-	// For fuzzy matching, we need to highlight individual characters
 	lowerText := strings.ToLower(truncated)
 	lowerQuery := strings.ToLower(query)
-	
-	// First check if it's a substring match (prioritize continuous matches)
+
 	index := strings.Index(lowerText, lowerQuery)
 	if index != -1 {
-		// Build the highlighted string for continuous match
 		highlightColor := yellowCode
 		if isSelected {
 			highlightColor = "\033[1;33m"
 		}
-		
+
 		resetColor := resetCode
 		if isSelected {
 			resetColor = "\033[0m" + cyanCode
 		}
-		
+
 		result := truncated[:index] + highlightColor + truncated[index:index+len(query)] + resetColor + truncated[index+len(query):]
 		return result
 	}
-	
-	// Fuzzy highlight - highlight matching characters
+
 	var result strings.Builder
 	textIdx := 0
 	queryIdx := 0
-	
+
 	highlightColor := yellowCode
 	if isSelected {
 		highlightColor = "\033[1;33m"
 	}
-	
+
 	resetColor := resetCode
 	if isSelected {
 		resetColor = "\033[0m" + cyanCode
 	}
-	
+
 	for textIdx < len(truncated) && queryIdx < len(lowerQuery) {
 		if strings.ToLower(string(truncated[textIdx])) == string(lowerQuery[queryIdx]) {
 			result.WriteString(highlightColor)
@@ -265,53 +293,35 @@ func highlightMatch(text, query string, isSelected bool, maxLen int) string {
 		}
 		textIdx++
 	}
-	
-	// Add remaining characters
+
 	if textIdx < len(truncated) {
 		result.WriteString(truncated[textIdx:])
 	}
-	
+
 	return result.String()
 }
 
-func (ui *PromptUI) render() {
-	// Build entire output as a string
+func (ui *PromptUI) render() (startIdx, endIdx int) {
 	var output strings.Builder
 
-	// Clear screen and move cursor to home
-	output.WriteString(cursorHomeCode)
 	output.WriteString(clearScreenCode)
+	output.WriteString(clearScrollbackCode)
+	output.WriteString(cursorHomeCode)
 	output.WriteString(hideCursorCode)
 
-	// Title
-	output.WriteString("Select a script to run (↑/↓ to navigate, Enter to select, Esc to cancel)")
-	output.WriteString(newline)
-	output.WriteString(newline)
-
-	// Search box
-	output.WriteString(fmt.Sprintf("Search: %s_", ui.searchQuery))
-	output.WriteString(newline)
-	output.WriteString(newline)
-
-	// Get terminal dimensions
 	termWidth, termHeight := getTerminalSize()
-	ui.maxHeight = termHeight - 6 // Reserve lines for header and search
+	ui.maxHeight = termHeight - 2
 	if ui.maxHeight < 5 {
 		ui.maxHeight = 5
 	}
 
-	// Calculate max widths for columns
-	// Reserve space for: prefix (2) + gap (2) + some space for command
 	availableWidth := termWidth - 4
 	if availableWidth < 20 {
 		availableWidth = 20 // Minimum reasonable width
 	}
-
-	// Split available width between name and command (40% name, 60% command)
 	maxNameDisplayWidth := (availableWidth * 4) / 10
 	maxCommandDisplayWidth := availableWidth - maxNameDisplayWidth - 2 // -2 for gap
 
-	// Find the longest name (up to maxNameDisplayWidth)
 	maxNameWidth := 0
 	for _, script := range ui.filteredScripts {
 		nameLen := len(script.Name)
@@ -323,62 +333,116 @@ func (ui *PromptUI) render() {
 		}
 	}
 
-	startIdx := 0
-	endIdx := len(ui.filteredScripts)
+	startIdx = ui.viewStartIdx
 
-	// Implement scrolling if list is too long
 	if len(ui.filteredScripts) > ui.maxHeight {
-		if ui.selectedIndex >= ui.maxHeight/2 {
-			startIdx = ui.selectedIndex - ui.maxHeight/2
-			if startIdx+ui.maxHeight > len(ui.filteredScripts) {
-				startIdx = len(ui.filteredScripts) - ui.maxHeight
+		scrollThreshold := 3
+		if ui.selectedIndex < startIdx+scrollThreshold {
+			startIdx = ui.selectedIndex - scrollThreshold
+			if startIdx < 0 {
+				startIdx = 0
 			}
+		}
+		if ui.selectedIndex >= startIdx+ui.maxHeight-scrollThreshold {
+			startIdx = ui.selectedIndex - ui.maxHeight + scrollThreshold + 1
+			if startIdx < 0 {
+				startIdx = 0
+			}
+		}
+		if startIdx+ui.maxHeight > len(ui.filteredScripts) {
+			startIdx = len(ui.filteredScripts) - ui.maxHeight
 		}
 		endIdx = startIdx + ui.maxHeight
 		if endIdx > len(ui.filteredScripts) {
 			endIdx = len(ui.filteredScripts)
 		}
-	}
-
-	if len(ui.filteredScripts) == 0 {
-		output.WriteString("  No scripts found")
-		output.WriteString(newline)
+		ui.viewStartIdx = startIdx
 	} else {
-		for i := startIdx; i < endIdx; i++ {
-			script := ui.filteredScripts[i]
-
-			isSelected := i == ui.selectedIndex
-
-			if isSelected {
-				output.WriteString(cyanCode)
-				output.WriteString("> ")
-			} else {
-				output.WriteString("  ")
-			}
-
-			// Highlight matching parts with truncation
-			highlightedName := highlightMatch(script.Name, ui.searchQuery, isSelected, maxNameDisplayWidth)
-			highlightedCommand := highlightMatch(script.Command, ui.searchQuery, isSelected, maxCommandDisplayWidth)
-
-			// Calculate padding for name (considering truncated length)
-			truncatedNameLen := len(truncateText(script.Name, maxNameDisplayWidth))
-			output.WriteString(highlightedName)
-			if truncatedNameLen < maxNameWidth {
-				output.WriteString(strings.Repeat(" ", maxNameWidth-truncatedNameLen))
-			}
-			output.WriteString("  ")
-			output.WriteString(highlightedCommand)
-
-			if isSelected {
-				output.WriteString(resetCode)
-			}
-
-			output.WriteString(newline)
-		}
+		ui.viewStartIdx = 0
+		startIdx = 0
+		endIdx = len(ui.filteredScripts)
 	}
 
-	// Print everything at once
+	displayedCount := 0
+	if len(ui.filteredScripts) == 0 {
+		displayedCount = 0
+	} else {
+		displayedCount = endIdx - startIdx
+	}
+
+	listLines := termHeight - 2
+	paddingLines := listLines - displayedCount
+	if paddingLines < 0 {
+		paddingLines = 0
+	}
+	for i := 0; i < paddingLines; i++ {
+		output.WriteString(clearLineCode)
+		output.WriteString(newline)
+	}
+
+	ui.scriptStartLine = paddingLines + 2
+
+	for i := startIdx; i < endIdx; i++ {
+		script := ui.filteredScripts[i]
+		isSelected := i == ui.selectedIndex
+		if isSelected {
+			output.WriteString(boldCode)
+			output.WriteString(cyanCode)
+			output.WriteString(bgDarkGrayCode)
+			output.WriteString("▌")
+			output.WriteString(resetCode)
+			output.WriteString(boldCode)
+			output.WriteString(bgDarkGrayCode)
+			output.WriteString(" ")
+			output.WriteString(cyanCode)
+		} else {
+			output.WriteString("  ")
+		}
+		highlightedName := highlightMatch(script.Name, ui.searchQuery, isSelected, maxNameDisplayWidth)
+		highlightedCommand := highlightMatch(script.Command, ui.searchQuery, isSelected, maxCommandDisplayWidth)
+		truncatedNameLen := len(truncateText(script.Name, maxNameDisplayWidth))
+		output.WriteString(highlightedName)
+		if truncatedNameLen < maxNameWidth {
+			padding := strings.Repeat(" ", maxNameWidth-truncatedNameLen)
+			output.WriteString(padding)
+		}
+		output.WriteString("  ")
+		output.WriteString(highlightedCommand)
+		if isSelected {
+			currentLen := 2 + maxNameWidth + 2 + len(truncateText(script.Command, maxCommandDisplayWidth))
+			if currentLen < termWidth {
+				output.WriteString(strings.Repeat(" ", termWidth-currentLen))
+			}
+			output.WriteString(resetCode)
+		}
+		output.WriteString(newline)
+	}
+
+	counter := ""
+	if len(ui.filteredScripts) > 0 {
+		counter = fmt.Sprintf("(%d/%d)", ui.selectedIndex+1, len(ui.filteredScripts))
+	} else {
+		counter = "(0/0)"
+	}
+	dividerWidth := termWidth - len(counter)
+	if dividerWidth < 0 {
+		dividerWidth = 0
+	}
+	output.WriteString(counter)
+	output.WriteString(strings.Repeat("─", dividerWidth))
+	output.WriteString(newline)
+
+	output.WriteString(boldCode)
+	output.WriteString(blueCode)
+	output.WriteString("> ")
+	output.WriteString(resetCode)
+	output.WriteString(boldCode)
+	output.WriteString(ui.searchQuery)
+	output.WriteString(showCursorCode)
+
 	fmt.Print(output.String())
+
+	return startIdx, endIdx
 }
 
 func showScriptPrompt() (*Script, error) {
@@ -391,14 +455,15 @@ func showScriptPrompt() (*Script, error) {
 		return nil, fmt.Errorf("no scripts found in package.json")
 	}
 
-	// Enable raw mode
 	oldState, err := enableRawMode()
 	if err != nil {
 		return nil, err
 	}
 
-	// Ensure cleanup
+	fmt.Print(enableMouseCode)
+
 	defer func() {
+		fmt.Print(disableMouseCode)
 		restoreTerminal(oldState)
 		fmt.Print(showCursorCode)
 		fmt.Print(cursorHomeCode)
@@ -407,27 +472,77 @@ func showScriptPrompt() (*Script, error) {
 
 	ui := NewPromptUI(scripts)
 
-	for {
-		ui.render()
+	// Set up terminal resize handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGWINCH)
+	defer signal.Stop(sigChan)
 
-		key, err := readKey()
-		if err != nil {
-			return nil, err
-		}
-
-		if isCtrlC(key) || isEscape(key) {
-			return nil, fmt.Errorf("cancelled")
-		} else if isEnter(key) {
-			selected := ui.getSelectedScript()
-			if selected != nil {
-				return selected, nil
+	// Handle resize signals in a goroutine
+	resizeChan := make(chan bool, 1)
+	go func() {
+		for range sigChan {
+			// Non-blocking send
+			select {
+			case resizeChan <- true:
+			default:
 			}
-		} else if isArrowUp(key) {
-			ui.moveUp()
-		} else if isArrowDown(key) {
-			ui.moveDown()
-		} else {
-			ui.handleSearchInput(key)
+		}
+	}()
+
+	// Channel for key input
+	keyChan := make(chan []byte)
+	errorChan := make(chan error)
+
+	// Read keys in a goroutine
+	go func() {
+		for {
+			key, err := readKey()
+			if err != nil {
+				errorChan <- err
+				return
+			}
+			keyChan <- key
+		}
+	}()
+
+	// Initial render
+	startIdx, endIdx := ui.render()
+
+	for {
+		select {
+		case <-resizeChan:
+			// Re-render on resize
+			startIdx, endIdx = ui.render()
+		case err := <-errorChan:
+			return nil, err
+		case key := <-keyChan:
+			// Check if it's a mouse event
+			if mouseEvent, ok := parseMouseEvent(key); ok {
+				if ui.handleMouseEvent(mouseEvent, startIdx, endIdx) {
+					// Double-click detected, run the script
+					selected := ui.getSelectedScript()
+					if selected != nil {
+						return selected, nil
+					}
+				}
+				startIdx, endIdx = ui.render()
+			} else if isCtrlC(key) || isEscape(key) {
+				return nil, fmt.Errorf("cancelled")
+			} else if isEnter(key) {
+				selected := ui.getSelectedScript()
+				if selected != nil {
+					return selected, nil
+				}
+			} else if isArrowUp(key) {
+				ui.moveUp()
+				startIdx, endIdx = ui.render()
+			} else if isArrowDown(key) {
+				ui.moveDown()
+				startIdx, endIdx = ui.render()
+			} else {
+				ui.handleSearchInput(key)
+				startIdx, endIdx = ui.render()
+			}
 		}
 	}
 }
