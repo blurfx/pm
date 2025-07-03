@@ -2,8 +2,6 @@ module pm
 
 go 1.23.0
 
-toolchain go1.24.4
-
 require (
 	github.com/spf13/cobra v1.8.0
 	golang.org/x/term v0.32.0
