@@ -380,7 +380,7 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 		output.WriteString(newline)
 	}
 
-	ui.scriptStartLine = paddingLines + 2
+	ui.scriptStartLine = paddingLines + 1
 
 	for i := startIdx; i < endIdx; i++ {
 		script := ui.filteredScripts[i]
