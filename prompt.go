@@ -5,32 +5,32 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 )
 
 const (
-	// ANSI escape codes
 	clearScreenCode     = "\033[2J"
 	clearScrollbackCode = "\033[3J"
 	cursorHomeCode      = "\033[H"
 	hideCursorCode      = "\033[?25l"
 	showCursorCode      = "\033[?25h"
+	enableMouseCode     = "\033[?1000h\033[?1002h\033[?1006h"
+	disableMouseCode    = "\033[?1000l\033[?1002l\033[?1006l"
 	clearLineCode       = "\033[K"
 	boldCode            = "\033[1m"
-	cyanCode            = "\033[36m"
-	yellowCode          = "\033[33m"
-	blueCode            = "\033[34m"
 	resetCode           = "\033[0m"
-	bgCyanCode          = "\033[46m"
-	bgBlackCode         = "\033[40m"
-	bgLightGrayCode     = "\033[47m"
-	bgDarkGrayCode      = "\033[100m"
-	// Mouse tracking
-	enableMouseCode  = "\033[?1000h\033[?1002h\033[?1006h"
-	disableMouseCode = "\033[?1000l\033[?1002l\033[?1006l"
-	// Use \r\n for proper line endings in raw mode
-	newline = "\r\n"
+	newline             = "\r\n"
+
+	yellowCode  = "\033[33m"
+	fgBlue      = "\033[34m"
+	magentaCode = "\033[35m"
+	fgMagenta   = "\033[38;5;198m"
+	bgGrayCode  = "\033[48;5;237m"
+
+	searchMarkerColor   = fgBlue
+	markerColor         = fgMagenta
+	selectedBgColor     = bgGrayCode
+	matchHighlightColor = yellowCode
 )
 
 type PromptUI struct {
@@ -261,7 +261,7 @@ func highlightMatch(text, query string, isSelected bool, maxLen int) string {
 
 		resetColor := resetCode
 		if isSelected {
-			resetColor = "\033[0m" + bgDarkGrayCode + cyanCode
+			resetColor = "\033[0m" + selectedBgColor
 		}
 
 		result := truncated[:index] + highlightColor + truncated[index:index+len(query)] + resetColor + truncated[index+len(query):]
@@ -279,7 +279,7 @@ func highlightMatch(text, query string, isSelected bool, maxLen int) string {
 
 	resetColor := resetCode
 	if isSelected {
-		resetColor = "\033[0m" + bgDarkGrayCode + cyanCode
+		resetColor = "\033[0m" + selectedBgColor
 	}
 
 	for textIdx < len(truncated) && queryIdx < len(lowerQuery) {
@@ -387,14 +387,14 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 		isSelected := i == ui.selectedIndex
 		if isSelected {
 			output.WriteString(boldCode)
-			output.WriteString(cyanCode)
-			output.WriteString(bgDarkGrayCode)
+			output.WriteString(magentaCode)
+			output.WriteString(selectedBgColor)
+			output.WriteString(markerColor)
 			output.WriteString("▌")
 			output.WriteString(resetCode)
 			output.WriteString(boldCode)
-			output.WriteString(bgDarkGrayCode)
+			output.WriteString(selectedBgColor)
 			output.WriteString(" ")
-			output.WriteString(cyanCode)
 		} else {
 			output.WriteString("  ")
 		}
@@ -433,7 +433,7 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 	output.WriteString(newline)
 
 	output.WriteString(boldCode)
-	output.WriteString(blueCode)
+	output.WriteString(searchMarkerColor)
 	output.WriteString("> ")
 	output.WriteString(resetCode)
 	output.WriteString(boldCode)
@@ -474,7 +474,7 @@ func showScriptPrompt() (*Script, error) {
 
 	// Set up terminal resize handling
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGWINCH)
+	setupResizeSignal(sigChan)
 	defer signal.Stop(sigChan)
 
 	// Handle resize signals in a goroutine
