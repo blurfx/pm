@@ -91,6 +91,9 @@ func main() {
 			nonTypedPackages := []string{}
 			for _, arg := range args {
 				if !strings.HasPrefix(arg, "@types/") {
+					if IsTypedPackage(arg) {
+						continue
+					}
 					ok, _ := CheckPackageExists("@types/" + arg)
 					if !ok {
 						continue
