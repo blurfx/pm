@@ -7,37 +7,42 @@ it's still a work in progress, but you can try it out.
 
 ## Installation
 
-Build from source:
+#### Install from Homebrew:
+
+```sh
+brew install blurfx/tap/pm
+```
+
+#### Build from source:
 
 ```sh
 go build
 ```
 
-move the binary to somewhere in your `PATH`.
-
 ## Usage
 
-install dependencies:
+interactive mode:
+
 ```sh
-pm install <packages> 
-# or 
+pm
+```
+
+running package manager commands:
+
+```sh
 pm i <packages>
-# or 
 pm add <packages>
-```
-
-install all dependencies:
-```sh
-pm install
-# or
-pm i
-```
-
-clean install:
-```sh
+pm rm <packages>
+pm uninstall <packages>
 pm ci
-# or 
-pm install --frozen-lockfile
+# ...
 ```
 
-... and more
+running package scripts:
+
+```sh
+pm dev
+pm build
+pm start
+# ...
+```
