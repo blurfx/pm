@@ -14,11 +14,12 @@ func CheckPackageExists(packageName string) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
 		return true, nil
-	} else if resp.StatusCode == http.StatusNotFound {
+	case http.StatusNotFound:
 		return false, nil
-	} else {
+	default:
 		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 }
@@ -35,7 +36,7 @@ type PackageInfo struct {
 
 func IsTypedPackage(packageName string) bool {
 	url := fmt.Sprintf("https://registry.npmjs.org/%s", packageName)
-	resp, err := http.Head(url)
+	resp, err := http.Get(url)
 	if err != nil {
 		return false
 	}
