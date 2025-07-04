@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -92,7 +91,6 @@ func (ct *CommandTranslator) translateAdd(args []string) *TranslatedCommand {
 	}
 
 	flags := ct.translateAddFlags(parsed.flags)
-	fmt.Println("flags", flags)
 
 	// Check if this is a dev/peer/optional/global install
 	// _, hasDev := parsed.flags["save-dev"]

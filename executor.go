@@ -12,7 +12,6 @@ func ExecuteTranslatedCommand(pm PackageManager, translated *TranslatedCommand) 
 	finalArgs := append(translated.Command, translated.Flags...)
 	finalArgs = append(finalArgs, translated.Args...)
 
-	fmt.Println("finalArgs", finalArgs)
 	// Execute the main command
 	err := executeCommand(string(pm), finalArgs...)
 	if err != nil {
