@@ -18,7 +18,6 @@ func ExecuteTranslatedCommand(pm PackageManager, translated *TranslatedCommand) 
 		return err
 	}
 
-	fmt.Println("translated.Args", translated.Args)
 	// Handle @types packages if needed
 	typesToInstall := []string{}
 

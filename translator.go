@@ -37,8 +37,6 @@ func (ct *CommandTranslator) Translate(args []string) *TranslatedCommand {
 		return ct.translateUninstall(remainingArgs)
 	case "ci":
 		return ct.translateCI(remainingArgs)
-	case "run":
-		return ct.translateRun(remainingArgs)
 	default:
 		return &TranslatedCommand{
 			Command: []string{baseCommand},
@@ -54,7 +52,7 @@ func (ct *CommandTranslator) translateInstall(args []string) *TranslatedCommand 
 		return ct.translateAdd(args)
 	}
 
-	command := []string{}
+	var command []string
 	switch ct.packageManager {
 	case PackageManagerNpm:
 		command = []string{"install"}
@@ -78,7 +76,7 @@ func (ct *CommandTranslator) translateInstall(args []string) *TranslatedCommand 
 func (ct *CommandTranslator) translateAdd(args []string) *TranslatedCommand {
 	parsed := ct.parseArgs(args)
 
-	command := []string{}
+	var command []string
 	switch ct.packageManager {
 	case PackageManagerNpm:
 		command = []string{"install"}
@@ -122,7 +120,7 @@ func (ct *CommandTranslator) translateAdd(args []string) *TranslatedCommand {
 func (ct *CommandTranslator) translateUninstall(args []string) *TranslatedCommand {
 	parsed := ct.parseArgs(args)
 
-	command := []string{}
+	var command []string
 	switch ct.packageManager {
 	case PackageManagerNpm:
 		command = []string{"uninstall"}
@@ -144,7 +142,7 @@ func (ct *CommandTranslator) translateUninstall(args []string) *TranslatedComman
 }
 
 func (ct *CommandTranslator) translateCI(args []string) *TranslatedCommand {
-	command := []string{}
+	var command []string
 	switch ct.packageManager {
 	case PackageManagerNpm:
 		command = []string{"ci"}
@@ -155,15 +153,6 @@ func (ct *CommandTranslator) translateCI(args []string) *TranslatedCommand {
 	case PackageManagerBun:
 		command = []string{"install", "--frozen-lockfile"}
 	}
-
-	return &TranslatedCommand{
-		Command: command,
-		Args:    args,
-	}
-}
-
-func (ct *CommandTranslator) translateRun(args []string) *TranslatedCommand {
-	command := []string{"run"}
 
 	return &TranslatedCommand{
 		Command: command,
@@ -263,7 +252,7 @@ func (ct *CommandTranslator) expandShortFlag(short string) string {
 }
 
 func (ct *CommandTranslator) translateInstallFlags(flags map[string]string) []string {
-	translated := []string{}
+	var translated []string
 
 	for flag, value := range flags {
 		switch flag {
@@ -290,7 +279,7 @@ func (ct *CommandTranslator) translateInstallFlags(flags map[string]string) []st
 }
 
 func (ct *CommandTranslator) translateAddFlags(flags map[string]string) []string {
-	translated := []string{}
+	var translated []string
 
 	for flag, value := range flags {
 		switch flag {
@@ -319,7 +308,7 @@ func (ct *CommandTranslator) translateAddFlags(flags map[string]string) []string
 }
 
 func (ct *CommandTranslator) translateUninstallFlags(flags map[string]string) []string {
-	translated := []string{}
+	var translated []string
 
 	for flag, value := range flags {
 		switch flag {
