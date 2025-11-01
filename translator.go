@@ -20,7 +20,7 @@ type TranslatedCommand struct {
 	Args    []string
 }
 
-func (ct *CommandTranslator) Translate(args []string) *TranslatedCommand {
+func (ct *CommandTranslator) Translate(packageManager PackageManager, args []string) *TranslatedCommand {
 	if len(args) == 0 {
 		return &TranslatedCommand{}
 	}
@@ -38,9 +38,15 @@ func (ct *CommandTranslator) Translate(args []string) *TranslatedCommand {
 	case "ci":
 		return ct.translateCI(remainingArgs)
 	default:
+		if IsBuiltInCommand(packageManager, baseCommand) {
+			return &TranslatedCommand{
+				Command: []string{baseCommand},
+				Args:    remainingArgs,
+			}
+		}
 		return &TranslatedCommand{
-			Command: []string{baseCommand},
-			Args:    remainingArgs,
+			Command: []string{"run"},
+			Args:    args,
 		}
 	}
 }

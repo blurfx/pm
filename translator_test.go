@@ -96,11 +96,31 @@ func TestTranslator(t *testing.T) {
 			input:          []string{"run", "test"},
 			expected:       "run test",
 		},
+
+		// test package.json scripts
+		{
+			name:           "run script with `run` command omitted",
+			packageManager: PackageManagerNpm,
+			input:          []string{"test"},
+			expected:       "run test",
+		},
+		{
+			name:           "run script with `run` command omitted",
+			packageManager: PackageManagerNpm,
+			input:          []string{"dev"},
+			expected:       "run dev",
+		},
+		{
+			name:           "run script with `run` command omitted",
+			packageManager: PackageManagerNpm,
+			input:          []string{"dev --host 0.0.0.0"},
+			expected:       "run dev --host 0.0.0.0",
+		},
 	}
 
 	for _, tc := range testCases {
 		translator := NewCommandTranslator(tc.packageManager)
-		result := translator.Translate(tc.input)
+		result := translator.Translate(tc.packageManager, tc.input)
 
 		// Build the actual command string
 		actualParts := append(result.Command, result.Flags...)

@@ -32,8 +32,7 @@ func main() {
 			}
 
 			translator := NewCommandTranslator(packageManager)
-			translated := translator.Translate(args)
-
+			translated := translator.Translate(packageManager, args)
 			if err := ExecuteTranslatedCommand(packageManager, translated); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
