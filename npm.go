@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 func CheckPackageExists(packageName string) (bool, error) {
@@ -52,4 +54,41 @@ func IsTypedPackage(packageName string) bool {
 	packageInfo := data.Versions[latestVersion]
 
 	return packageInfo.Types != "" || packageInfo.Typings != ""
+}
+
+type LocalPackageJSON struct {
+	Dependencies    map[string]string `json:"dependencies"`
+	DevDependencies map[string]string `json:"devDependencies"`
+}
+
+func IsTypeScriptPackage() bool {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return false
+	}
+
+	tsconfigPath := filepath.Join(cwd, "tsconfig.json")
+	if _, err := os.Stat(tsconfigPath); err == nil {
+		return true
+	}
+
+	packageJSONPath := filepath.Join(cwd, "package.json")
+	data, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return false
+	}
+
+	var pkg LocalPackageJSON
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return false
+	}
+
+	if _, ok := pkg.Dependencies["typescript"]; ok {
+		return true
+	}
+	if _, ok := pkg.DevDependencies["typescript"]; ok {
+		return true
+	}
+
+	return false
 }

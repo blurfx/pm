@@ -19,6 +19,10 @@ func ExecuteTranslatedCommand(pm PackageManager, translated *TranslatedCommand) 
 	}
 
 	// Handle @types packages if needed
+	if !IsTypeScriptPackage() {
+		return nil
+	}
+
 	typesToInstall := []string{}
 
 	for _, pkg := range translated.Args {
