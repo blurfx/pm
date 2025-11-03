@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -448,12 +449,26 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 }
 
 func showScriptPrompt() (*Script, error) {
-	scripts, err := getScriptsOrdered()
+	packageJSONPath, err := FindPackageJSON()
+	if err != nil {
+		return nil, fmt.Errorf("cannot find package.json: %v", err)
+	}
+
+	data, err := os.ReadFile(packageJSONPath)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read package.json: %v", err)
+	}
+
+	var pkg PackageJSON
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil, fmt.Errorf("cannot parse package.json: %v", err)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	if len(scripts) == 0 {
+	if len(pkg.OrderedScripts) == 0 {
 		return nil, fmt.Errorf("no scripts found in package.json")
 	}
 
@@ -472,7 +487,7 @@ func showScriptPrompt() (*Script, error) {
 		fmt.Print(showCursorCode)
 	}()
 
-	ui := NewPromptUI(scripts)
+	ui := NewPromptUI(pkg.OrderedScripts)
 
 	// Set up terminal resize handling
 	sigChan := make(chan os.Signal, 1)

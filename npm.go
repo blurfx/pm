@@ -56,29 +56,26 @@ func IsTypedPackage(packageName string) bool {
 	return packageInfo.Types != "" || packageInfo.Typings != ""
 }
 
-type LocalPackageJSON struct {
-	Dependencies    map[string]string `json:"dependencies"`
-	DevDependencies map[string]string `json:"devDependencies"`
-}
-
 func IsTypeScriptPackage() bool {
-	cwd, err := os.Getwd()
+	projectRoot, err := FindProjectRoot()
 	if err != nil {
 		return false
 	}
 
-	tsconfigPath := filepath.Join(cwd, "tsconfig.json")
+	// Check 1: Look for tsconfig.json in project root
+	tsconfigPath := filepath.Join(projectRoot, "tsconfig.json")
 	if _, err := os.Stat(tsconfigPath); err == nil {
 		return true
 	}
 
-	packageJSONPath := filepath.Join(cwd, "package.json")
+	// Check 2: Look for typescript in package.json dependencies
+	packageJSONPath := filepath.Join(projectRoot, "package.json")
 	data, err := os.ReadFile(packageJSONPath)
 	if err != nil {
 		return false
 	}
 
-	var pkg LocalPackageJSON
+	var pkg PackageJSON
 	if err := json.Unmarshal(data, &pkg); err != nil {
 		return false
 	}

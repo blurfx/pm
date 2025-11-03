@@ -6,20 +6,7 @@ import (
 	"os/exec"
 )
 
-func PassThrough(args ...string) error {
-	packageManager, err := DetectPackageManager()
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command(string(packageManager), args...)
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
-}
+type flagAlias map[PackageManager][]string
 
 func Exec(command CommandAlias, args ...string) error {
 	return ExecWithFlag(command, []flagAlias{}, args...)

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 )
 
 type PackageJSON struct {
-	Scripts map[string]string `json:"scripts"`
+	Dependencies    map[string]string `json:"dependencies"`
+	DevDependencies map[string]string `json:"devDependencies"`
+	Scripts         map[string]string `json:"scripts"`
+	OrderedScripts  []Script
 }
 
 type Script struct {
@@ -17,11 +18,7 @@ type Script struct {
 	Command string
 }
 
-type OrderedScripts struct {
-	Scripts []Script
-}
-
-func (os *OrderedScripts) UnmarshalJSON(data []byte) error {
+func (p *PackageJSON) UnmarshalJSON(data []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -58,7 +55,7 @@ func (os *OrderedScripts) UnmarshalJSON(data []byte) error {
 			return err
 		}
 
-		os.Scripts = append(os.Scripts, Script{
+		p.OrderedScripts = append(p.OrderedScripts, Script{
 			Name:    key,
 			Command: value,
 		})
@@ -73,24 +70,4 @@ func (os *OrderedScripts) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
-}
-
-func getScriptsOrdered() ([]Script, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	packageJSONPath := filepath.Join(cwd, "package.json")
-	data, err := os.ReadFile(packageJSONPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read package.json: %w", err)
-	}
-
-	var ordered OrderedScripts
-	if err := json.Unmarshal(data, &ordered); err != nil {
-		return nil, fmt.Errorf("failed to parse package.json: %w", err)
-	}
-
-	return ordered.Scripts, nil
 }
