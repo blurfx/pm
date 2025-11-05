@@ -1,4 +1,4 @@
-package main
+package detector
 
 import (
 	"encoding/json"
@@ -9,23 +9,14 @@ import (
 	"strings"
 )
 
-type PackageManager string
-
-const (
-	PackageManagerNpm  PackageManager = "npm"
-	PackageManagerYarn PackageManager = "yarn"
-	PackageManagerPnpm PackageManager = "pnpm"
-	PackageManagerBun  PackageManager = "bun"
-)
-
-const MAX_TRAVERSE_DEPTH = 20
+const maxTraverseDepth = 20
 
 func fileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	return !os.IsNotExist(err)
 }
 
-type packageJsonConfig struct {
+type packageJSONConfig struct {
 	PackageManager string `json:"packageManager"`
 }
 
@@ -36,32 +27,32 @@ func detectPackageManager() (PackageManager, error) {
 	}
 
 	rootDir, err := FindProjectRoot()
-	if err == nil {
+	if err != nil {
 		return "", fmt.Errorf("no package manager detected")
 	}
 	if fileExists(filepath.Join(rootDir, "package-lock.json")) {
-		return PackageManagerNpm, nil
+		return NPM, nil
 	} else if fileExists(filepath.Join(rootDir, "yarn.lock")) {
-		return PackageManagerYarn, nil
+		return Yarn, nil
 	} else if fileExists(filepath.Join(rootDir, "pnpm-lock.yaml")) {
-		return PackageManagerPnpm, nil
+		return Pnpm, nil
 	} else if fileExists(filepath.Join(rootDir, "bun.lock")) || fileExists(filepath.Join(currentDir, "bun.lockb")) {
-		return PackageManagerBun, nil
+		return Bun, nil
 	}
 
-	packageJsonPath, err := FindPackageJSON()
+	packageJSONPath, err := FindPackageJSON()
 	if err != nil {
 		return "", fmt.Errorf("no package manager detected")
 	}
 
-	file, err := os.Open(packageJsonPath)
+	file, err := os.Open(packageJSONPath)
 	if err == nil {
 		defer file.Close()
-		var packageJson packageJsonConfig
+		var packageJSON packageJSONConfig
 		decoder := json.NewDecoder(file)
-		err = decoder.Decode(&packageJson)
-		if err == nil && packageJson.PackageManager != "" {
-			return PackageManager(strings.Split(packageJson.PackageManager, "@")[0]), nil
+		err = decoder.Decode(&packageJSON)
+		if err == nil && packageJSON.PackageManager != "" {
+			return PackageManager(strings.Split(packageJSON.PackageManager, "@")[0]), nil
 		}
 	}
 
@@ -75,22 +66,23 @@ func isCommandAvailable(name string) bool {
 
 func detectInstalledPackageManagers() (PackageManager, error) {
 	if isCommandAvailable("npm") {
-		return PackageManagerNpm, nil
+		return NPM, nil
 	}
 	if isCommandAvailable("yarn") {
-		return PackageManagerYarn, nil
+		return Yarn, nil
 	}
 	if isCommandAvailable("pnpm") {
-		return PackageManagerPnpm, nil
+		return Pnpm, nil
 	}
 	if isCommandAvailable("bun") {
-		return PackageManagerBun, nil
+		return Bun, nil
 	}
 
 	return "", fmt.Errorf("no package manager detected (supported: npm, yarn, pnpm, bun)")
 }
 
-func DetectPackageManager() (PackageManager, error) {
+// Detect detects the package manager used in the current project
+func Detect() (PackageManager, error) {
 	packageManager, err := detectPackageManager()
 	if err == nil {
 		return packageManager, nil
@@ -114,8 +106,8 @@ func FindPackageJSON() (string, error) {
 		}
 
 		parentDir := filepath.Dir(currentDir)
-		depth += 1
-		if parentDir == currentDir || depth > MAX_TRAVERSE_DEPTH {
+		depth++
+		if parentDir == currentDir || depth > maxTraverseDepth {
 			break
 		}
 		currentDir = parentDir
@@ -140,8 +132,8 @@ func FindProjectRoot() (string, error) {
 		}
 
 		parentDir := filepath.Dir(currentDir)
-		depth += 1
-		if parentDir == currentDir || depth > MAX_TRAVERSE_DEPTH {
+		depth++
+		if parentDir == currentDir || depth > maxTraverseDepth {
 			break
 		}
 		currentDir = parentDir

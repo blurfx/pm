@@ -1,9 +1,11 @@
-package main
+package translator
+
+import "pm/internal/detector"
 
 // Internal CLI commands
 
 // v11
-var NPM_COMMANDS = [][]string{
+var npmCommands = [][]string{
 	{"access"},
 	{"adduser"},
 	{"audit"},
@@ -70,7 +72,7 @@ var NPM_COMMANDS = [][]string{
 	{"whoami"},
 }
 
-var YARN_CLASSIC_COMMANDS = [][]string{
+var yarnClassicCommands = [][]string{
 	{"add"},
 	{"audit"},
 	{"autoclean"},
@@ -115,7 +117,7 @@ var YARN_CLASSIC_COMMANDS = [][]string{
 	{"workspaces"},
 }
 
-var YARN2_COMMANDS = [][]string{
+var yarn2Commands = [][]string{
 	{"add"},
 	{"bin"},
 	{"cache", "clean"},
@@ -174,7 +176,7 @@ var YARN2_COMMANDS = [][]string{
 	{"workspaces", "list"},
 }
 
-var PNPM_COMMANDS = [][]string{
+var pnpmCommands = [][]string{
 	// Manage dependencies
 	{"add"},
 	{"install"},
@@ -243,7 +245,7 @@ var PNPM_COMMANDS = [][]string{
 	{"config"},
 }
 
-var BUN_COMMANDS = [][]string{
+var bunCommands = [][]string{
 	{"run"},
 	{"test"},
 	{"x"},
@@ -270,17 +272,18 @@ var BUN_COMMANDS = [][]string{
 	{"upgrade"},
 }
 
-var IsBuiltInCommand = func(packageManager PackageManager, arg ...string) bool {
+// IsBuiltIn checks if the given command is a built-in command for the package manager
+func IsBuiltIn(packageManager detector.PackageManager, arg ...string) bool {
 	var commands [][]string
 	switch packageManager {
-	case PackageManagerNpm:
-		commands = NPM_COMMANDS
-	case PackageManagerYarn:
-		commands = YARN_CLASSIC_COMMANDS
-	case PackageManagerPnpm:
-		commands = PNPM_COMMANDS
-	case PackageManagerBun:
-		commands = BUN_COMMANDS
+	case detector.NPM:
+		commands = npmCommands
+	case detector.Yarn:
+		commands = yarnClassicCommands
+	case detector.Pnpm:
+		commands = pnpmCommands
+	case detector.Bun:
+		commands = bunCommands
 	default:
 		return false
 	}

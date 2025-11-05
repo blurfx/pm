@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"os"
@@ -62,6 +62,7 @@ func isCtrlC(key []byte) bool {
 	return len(key) == 1 && key[0] == 3
 }
 
+// MouseEvent represents a mouse interaction event
 type MouseEvent struct {
 	Button int
 	X      int
@@ -69,7 +70,7 @@ type MouseEvent struct {
 	Type   string // "click", "scroll_up", "scroll_down"
 }
 
-// Parse SGR mouse event (ESC[<button;x;yM/m)
+// parseMouseEvent parses SGR mouse event (ESC[<button;x;yM/m)
 func parseMouseEvent(data []byte) (*MouseEvent, bool) {
 	str := string(data)
 

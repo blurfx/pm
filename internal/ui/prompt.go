@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"encoding/json"
@@ -7,6 +7,9 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+
+	"pm/internal/detector"
+	"pm/internal/project"
 )
 
 const (
@@ -30,15 +33,15 @@ const (
 	fgMagenta   = "\033[38;5;198m"
 	bgGrayCode  = "\033[48;5;237m"
 
-	searchMarkerColor   = fgBlue
-	markerColor         = fgMagenta
-	selectedBgColor     = bgGrayCode
-	matchHighlightColor = yellowCode
+	searchMarkerColor = fgBlue
+	markerColor       = fgMagenta
+	selectedBgColor   = bgGrayCode
 )
 
+// PromptUI manages the interactive script selection UI
 type PromptUI struct {
-	scripts         []Script
-	filteredScripts []Script
+	scripts         []project.Script
+	filteredScripts []project.Script
 	selectedIndex   int
 	searchQuery     string
 	maxHeight       int
@@ -50,7 +53,8 @@ type PromptUI struct {
 	viewStartIdx int // Current view window start index
 }
 
-func NewPromptUI(scripts []Script) *PromptUI {
+// NewPromptUI creates a new prompt UI with the given scripts
+func NewPromptUI(scripts []project.Script) *PromptUI {
 	ui := &PromptUI{
 		scripts:         scripts,
 		filteredScripts: scripts,
@@ -60,68 +64,8 @@ func NewPromptUI(scripts []Script) *PromptUI {
 	return ui
 }
 
-func fuzzyMatch(text, query string) bool {
-	if query == "" {
-		return true
-	}
-
-	textLower := strings.ToLower(text)
-	queryLower := strings.ToLower(query)
-
-	textIdx := 0
-	queryIdx := 0
-
-	for textIdx < len(textLower) && queryIdx < len(queryLower) {
-		if textLower[textIdx] == queryLower[queryIdx] {
-			queryIdx++
-		}
-		textIdx++
-	}
-
-	return queryIdx == len(queryLower)
-}
-
-func fuzzyScore(text, query string) int {
-	if query == "" {
-		return 0
-	}
-
-	textLower := strings.ToLower(text)
-	queryLower := strings.ToLower(query)
-
-	score := 0
-	textIdx := 0
-	queryIdx := 0
-	lastMatchIdx := -1
-
-	for textIdx < len(textLower) && queryIdx < len(queryLower) {
-		if textLower[textIdx] == queryLower[queryIdx] {
-			if lastMatchIdx != -1 {
-				score += textIdx - lastMatchIdx
-			}
-			lastMatchIdx = textIdx
-			queryIdx++
-		}
-		textIdx++
-	}
-
-	if queryIdx < len(queryLower) {
-		return 999999
-	}
-
-	if strings.Contains(textLower, queryLower) {
-		score -= 100
-	}
-
-	if strings.HasPrefix(textLower, queryLower) {
-		score -= 200
-	}
-
-	return score
-}
-
 type scoredScript struct {
-	script Script
+	script project.Script
 	score  int
 }
 
@@ -157,7 +101,7 @@ func (ui *PromptUI) filterScripts() {
 		}
 	}
 
-	ui.filteredScripts = make([]Script, len(scored))
+	ui.filteredScripts = make([]project.Script, len(scored))
 	for i, s := range scored {
 		ui.filteredScripts[i] = s.script
 	}
@@ -196,7 +140,7 @@ func (ui *PromptUI) handleSearchInput(key []byte) {
 	}
 }
 
-func (ui *PromptUI) getSelectedScript() *Script {
+func (ui *PromptUI) getSelectedScript() *project.Script {
 	if len(ui.filteredScripts) == 0 || ui.selectedIndex >= len(ui.filteredScripts) {
 		return nil
 	}
@@ -448,8 +392,9 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 	return startIdx, endIdx
 }
 
-func showScriptPrompt() (*Script, error) {
-	packageJSONPath, err := FindPackageJSON()
+// ShowScriptPrompt displays an interactive prompt for selecting a script
+func ShowScriptPrompt() (*project.Script, error) {
+	packageJSONPath, err := detector.FindPackageJSON()
 	if err != nil {
 		return nil, fmt.Errorf("cannot find package.json: %v", err)
 	}
@@ -459,13 +404,9 @@ func showScriptPrompt() (*Script, error) {
 		return nil, fmt.Errorf("cannot read package.json: %v", err)
 	}
 
-	var pkg PackageJSON
+	var pkg project.PackageJSON
 	if err := json.Unmarshal(data, &pkg); err != nil {
 		return nil, fmt.Errorf("cannot parse package.json: %v", err)
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	if len(pkg.OrderedScripts) == 0 {

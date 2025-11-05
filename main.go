@@ -6,6 +6,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"pm/internal/detector"
+	"pm/internal/executor"
+	"pm/internal/translator"
+	"pm/internal/ui"
 )
 
 func main() {
@@ -14,26 +19,26 @@ func main() {
 		Short:              "A universal package manager wrapper",
 		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			packageManager, err := DetectPackageManager()
+			pm, err := detector.Detect()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return
 			}
 			if len(args) == 0 {
-				script, err := showScriptPrompt()
+				script, err := ui.ShowScriptPrompt()
 				if err != nil {
 					if err.Error() != "cancelled" {
 						fmt.Fprintln(os.Stderr, err)
 					}
 					return
 				}
-				Exec(Commands.Run, script.Name)
+				executor.Run(pm, translator.Commands.Run, script.Name)
 				return
 			}
 
-			translator := NewCommandTranslator(packageManager)
-			translated := translator.Translate(packageManager, args)
-			if err := ExecuteTranslatedCommand(packageManager, translated); err != nil {
+			tr := translator.New(pm)
+			translated := tr.Translate(pm, args)
+			if err := executor.Execute(pm, translated); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
 		},
