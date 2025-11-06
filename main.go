@@ -11,6 +11,7 @@ import (
 	"pm/internal/executor"
 	"pm/internal/translator"
 	"pm/internal/ui"
+	"pm/internal/version"
 )
 
 func main() {
@@ -19,6 +20,11 @@ func main() {
 		Short:              "A universal package manager wrapper",
 		DisableFlagParsing: true,
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 1 && (args[0] == "-v" || args[0] == "--version") {
+				fmt.Println(version.GetVersion())
+				return
+			}
+
 			pm, err := detector.Detect()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)

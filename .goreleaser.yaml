@@ -18,6 +18,10 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -s -w
+      - -X pm/internal/version.Version={{.Version}}
+      - -X pm/internal/version.Commit={{.Commit}}
 
 archives:
   - formats: [tar.gz]
