@@ -119,12 +119,16 @@ func (ui *PromptUI) filterScripts() {
 func (ui *PromptUI) moveUp() {
 	if ui.selectedIndex > 0 {
 		ui.selectedIndex--
+	} else {
+		ui.selectedIndex = len(ui.filteredScripts) - 1
 	}
 }
 
 func (ui *PromptUI) moveDown() {
 	if ui.selectedIndex < len(ui.filteredScripts)-1 {
 		ui.selectedIndex++
+	} else {
+		ui.selectedIndex = 0
 	}
 }
 
