@@ -1,6 +1,17 @@
 package ui
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
+
+func toLowerRunes(s string) []rune {
+	runes := []rune(s)
+	for i, r := range runes {
+		runes[i] = unicode.ToLower(r)
+	}
+	return runes
+}
 
 // fuzzyMatch checks if query matches text in a fuzzy manner
 func fuzzyMatch(text, query string) bool {
@@ -8,20 +19,21 @@ func fuzzyMatch(text, query string) bool {
 		return true
 	}
 
-	textLower := strings.ToLower(text)
-	queryLower := strings.ToLower(query)
+	textRunes := toLowerRunes(text)
+	queryRunes := toLowerRunes(query)
 
-	textIdx := 0
 	queryIdx := 0
 
-	for textIdx < len(textLower) && queryIdx < len(queryLower) {
-		if textLower[textIdx] == queryLower[queryIdx] {
+	for _, r := range textRunes {
+		if r == queryRunes[queryIdx] {
 			queryIdx++
+			if queryIdx == len(queryRunes) {
+				return true
+			}
 		}
-		textIdx++
 	}
 
-	return queryIdx == len(queryLower)
+	return false
 }
 
 // fuzzyScore calculates a fuzzy match score (lower is better)
@@ -30,16 +42,16 @@ func fuzzyScore(text, query string) int {
 		return 0
 	}
 
-	textLower := strings.ToLower(text)
-	queryLower := strings.ToLower(query)
+	textRunes := toLowerRunes(text)
+	queryRunes := toLowerRunes(query)
 
 	score := 0
 	textIdx := 0
 	queryIdx := 0
 	lastMatchIdx := -1
 
-	for textIdx < len(textLower) && queryIdx < len(queryLower) {
-		if textLower[textIdx] == queryLower[queryIdx] {
+	for textIdx < len(textRunes) && queryIdx < len(queryRunes) {
+		if textRunes[textIdx] == queryRunes[queryIdx] {
 			if lastMatchIdx != -1 {
 				score += textIdx - lastMatchIdx
 			}
@@ -49,9 +61,12 @@ func fuzzyScore(text, query string) int {
 		textIdx++
 	}
 
-	if queryIdx < len(queryLower) {
+	if queryIdx < len(queryRunes) {
 		return 999999
 	}
+
+	textLower := string(textRunes)
+	queryLower := string(queryRunes)
 
 	if strings.Contains(textLower, queryLower) {
 		score -= 100

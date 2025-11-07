@@ -7,6 +7,10 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/mattn/go-runewidth"
 
 	"pm/internal/detector"
 	"pm/internal/project"
@@ -116,6 +120,13 @@ func (ui *PromptUI) filterScripts() {
 	ui.viewStartIdx = 0
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func (ui *PromptUI) moveUp() {
 	if ui.selectedIndex > 0 {
 		ui.selectedIndex--
@@ -135,11 +146,33 @@ func (ui *PromptUI) moveDown() {
 func (ui *PromptUI) handleSearchInput(key []byte) {
 	if isBackspace(key) {
 		if len(ui.searchQuery) > 0 {
-			ui.searchQuery = ui.searchQuery[:len(ui.searchQuery)-1]
-			ui.filterScripts()
+			runes := []rune(ui.searchQuery)
+			if len(runes) > 0 {
+				ui.searchQuery = string(runes[:len(runes)-1])
+				ui.filterScripts()
+			}
 		}
-	} else if len(key) == 1 && key[0] >= 32 && key[0] <= 126 {
-		ui.searchQuery += string(key)
+		return
+	}
+
+	if len(key) == 0 || !utf8.Valid(key) {
+		return
+	}
+
+	appended := false
+
+	for _, r := range string(key) {
+		if r == '\r' || r == '\n' {
+			continue
+		}
+		if unicode.IsControl(r) && r != ' ' {
+			continue
+		}
+		ui.searchQuery += string(r)
+		appended = true
+	}
+
+	if appended {
 		ui.filterScripts()
 	}
 }
@@ -183,45 +216,57 @@ func (ui *PromptUI) handleMouseEvent(event *MouseEvent, startIdx, endIdx int) bo
 	return false
 }
 
-func truncateText(text string, maxLen int) string {
-	if len(text) <= maxLen {
+func truncateText(text string, maxWidth int) string {
+	if maxWidth <= 0 || len(text) == 0 {
+		return ""
+	}
+
+	if runewidth.StringWidth(text) <= maxWidth {
 		return text
 	}
-	if maxLen <= 3 {
-		return "..."
+
+	const ellipsis = "..."
+	ellipsisWidth := runewidth.StringWidth(ellipsis)
+	if maxWidth <= ellipsisWidth {
+		return ellipsis[:maxWidth]
 	}
-	return text[:maxLen-3] + "..."
+
+	var builder strings.Builder
+	currentWidth := 0
+	limit := maxWidth - ellipsisWidth
+
+	for _, r := range text {
+		rw := runewidth.RuneWidth(r)
+		if currentWidth+rw > limit {
+			break
+		}
+		builder.WriteRune(r)
+		currentWidth += rw
+	}
+
+	builder.WriteString(ellipsis)
+	return builder.String()
 }
 
-func highlightMatch(text, query string, isSelected bool, maxLen int) string {
-	truncated := truncateText(text, maxLen)
-
+func highlightMatch(text, query string, isSelected bool) string {
 	if query == "" {
-		return truncated
+		return text
 	}
 
-	lowerText := strings.ToLower(truncated)
-	lowerQuery := strings.ToLower(query)
-
-	index := strings.Index(lowerText, lowerQuery)
-	if index != -1 {
-		highlightColor := yellowCode
-		if isSelected {
-			highlightColor = "\033[1;33m"
-		}
-
-		resetColor := resetCode
-		if isSelected {
-			resetColor = "\033[0m" + selectedBgColor
-		}
-
-		result := truncated[:index] + highlightColor + truncated[index:index+len(query)] + resetColor + truncated[index+len(query):]
-		return result
+	textRunes := []rune(text)
+	if len(textRunes) == 0 {
+		return text
 	}
 
-	var result strings.Builder
-	textIdx := 0
-	queryIdx := 0
+	queryRunes := []rune(query)
+	if len(queryRunes) == 0 {
+		return text
+	}
+
+	lowerQuery := make([]rune, len(queryRunes))
+	for i, r := range queryRunes {
+		lowerQuery[i] = unicode.ToLower(r)
+	}
 
 	highlightColor := yellowCode
 	if isSelected {
@@ -233,23 +278,46 @@ func highlightMatch(text, query string, isSelected bool, maxLen int) string {
 		resetColor = "\033[0m" + selectedBgColor
 	}
 
-	for textIdx < len(truncated) && queryIdx < len(lowerQuery) {
-		if strings.ToLower(string(truncated[textIdx])) == string(lowerQuery[queryIdx]) {
-			result.WriteString(highlightColor)
-			result.WriteByte(truncated[textIdx])
-			result.WriteString(resetColor)
+	// Try to highlight the longest contiguous match first.
+	startIdx := -1
+	for i := 0; i <= len(textRunes)-len(lowerQuery); i++ {
+		match := true
+		for j := 0; j < len(lowerQuery); j++ {
+			if unicode.ToLower(textRunes[i+j]) != lowerQuery[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			startIdx = i
+			break
+		}
+	}
+
+	var builder strings.Builder
+
+	if startIdx != -1 {
+		builder.WriteString(string(textRunes[:startIdx]))
+		builder.WriteString(highlightColor)
+		builder.WriteString(string(textRunes[startIdx : startIdx+len(lowerQuery)]))
+		builder.WriteString(resetColor)
+		builder.WriteString(string(textRunes[startIdx+len(lowerQuery):]))
+		return builder.String()
+	}
+
+	queryIdx := 0
+	for _, r := range textRunes {
+		if queryIdx < len(lowerQuery) && unicode.ToLower(r) == lowerQuery[queryIdx] {
+			builder.WriteString(highlightColor)
+			builder.WriteRune(r)
+			builder.WriteString(resetColor)
 			queryIdx++
 		} else {
-			result.WriteByte(truncated[textIdx])
+			builder.WriteRune(r)
 		}
-		textIdx++
 	}
 
-	if textIdx < len(truncated) {
-		result.WriteString(truncated[textIdx:])
-	}
-
-	return result.String()
+	return builder.String()
 }
 
 func (ui *PromptUI) render() (startIdx, endIdx int) {
@@ -275,12 +343,10 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 
 	maxNameWidth := 0
 	for _, script := range ui.filteredScripts {
-		nameLen := len(script.Name)
-		if nameLen > maxNameDisplayWidth {
-			nameLen = maxNameDisplayWidth
-		}
-		if nameLen > maxNameWidth {
-			maxNameWidth = nameLen
+		truncatedName := truncateText(script.Name, maxNameDisplayWidth)
+		nameWidth := runewidth.StringWidth(truncatedName)
+		if nameWidth > maxNameWidth {
+			maxNameWidth = nameWidth
 		}
 	}
 
@@ -349,20 +415,25 @@ func (ui *PromptUI) render() (startIdx, endIdx int) {
 		} else {
 			output.WriteString("  ")
 		}
-		highlightedName := highlightMatch(script.Name, ui.searchQuery, isSelected, maxNameDisplayWidth)
-		highlightedCommand := highlightMatch(script.Command, ui.searchQuery, isSelected, maxCommandDisplayWidth)
-		truncatedNameLen := len(truncateText(script.Name, maxNameDisplayWidth))
+
+		truncatedName := truncateText(script.Name, maxNameDisplayWidth)
+		truncatedCommand := truncateText(script.Command, maxCommandDisplayWidth)
+		nameWidth := runewidth.StringWidth(truncatedName)
+		commandWidth := runewidth.StringWidth(truncatedCommand)
+
+		highlightedName := highlightMatch(truncatedName, ui.searchQuery, isSelected)
+		highlightedCommand := highlightMatch(truncatedCommand, ui.searchQuery, isSelected)
+
 		output.WriteString(highlightedName)
-		if truncatedNameLen < maxNameWidth {
-			padding := strings.Repeat(" ", maxNameWidth-truncatedNameLen)
-			output.WriteString(padding)
+		if nameWidth < maxNameWidth {
+			output.WriteString(strings.Repeat(" ", maxNameWidth-nameWidth))
 		}
 		output.WriteString("  ")
 		output.WriteString(highlightedCommand)
 		if isSelected {
-			currentLen := 2 + maxNameWidth + 2 + len(truncateText(script.Command, maxCommandDisplayWidth))
-			if currentLen < termWidth {
-				output.WriteString(strings.Repeat(" ", termWidth-currentLen))
+			currentWidth := 2 + maxNameWidth + 2 + commandWidth
+			if currentWidth < termWidth {
+				output.WriteString(strings.Repeat(" ", termWidth-currentWidth))
 			}
 			output.WriteString(resetCode)
 		}
