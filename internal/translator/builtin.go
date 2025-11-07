@@ -280,6 +280,8 @@ func IsBuiltIn(packageManager detector.PackageManager, arg ...string) bool {
 		commands = npmCommands
 	case detector.Yarn:
 		commands = yarnClassicCommands
+	case detector.YarnBerry:
+		commands = yarn2Commands
 	case detector.Pnpm:
 		commands = pnpmCommands
 	case detector.Bun:

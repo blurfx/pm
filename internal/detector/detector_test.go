@@ -13,6 +13,7 @@ func TestPackageManagerType(t *testing.T) {
 	}{
 		{NPM, "npm"},
 		{Yarn, "yarn"},
+		{YarnBerry, "yarn-berry"},
 		{Pnpm, "pnpm"},
 		{Bun, "bun"},
 	}
@@ -124,10 +125,10 @@ func TestFindProjectRoot(t *testing.T) {
 
 func TestDetectPackageManagerByLockfile(t *testing.T) {
 	tests := []struct {
-		name         string
-		lockfile     string
-		wantPM       PackageManager
-		expectError  bool
+		name        string
+		lockfile    string
+		wantPM      PackageManager
+		expectError bool
 	}{
 		{
 			name:     "npm - package-lock.json",
@@ -193,11 +194,43 @@ func TestDetectPackageManagerByLockfile(t *testing.T) {
 	}
 }
 
+func TestDetectYarnBerryByLockfileIndicators(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	packageJSON := filepath.Join(tmpDir, "package.json")
+	if err := os.WriteFile(packageJSON, []byte(`{"name":"test"}`), 0644); err != nil {
+		t.Fatalf("Failed to create package.json: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "yarn.lock"), []byte(``), 0644); err != nil {
+		t.Fatalf("Failed to create yarn.lock: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(tmpDir, ".yarnrc.yml"), []byte("yarnPath: .yarn/releases/yarn-berry.cjs"), 0644); err != nil {
+		t.Fatalf("Failed to create .yarnrc.yml: %v", err)
+	}
+
+	originalWd, _ := os.Getwd()
+	defer os.Chdir(originalWd)
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change dir: %v", err)
+	}
+
+	pm, err := Detect()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if pm != YarnBerry {
+		t.Fatalf("Detect() = %s, want YarnBerry", pm)
+	}
+}
+
 func TestDetectPackageManagerByPackageJSON(t *testing.T) {
 	tests := []struct {
-		name         string
-		packageJSON  string
-		wantPM       PackageManager
+		name        string
+		packageJSON string
+		wantPM      PackageManager
 	}{
 		{
 			name: "npm specified in packageManager field",
@@ -208,12 +241,20 @@ func TestDetectPackageManagerByPackageJSON(t *testing.T) {
 			wantPM: NPM,
 		},
 		{
-			name: "yarn specified in packageManager field",
+			name: "yarn classic specified in packageManager field",
+			packageJSON: `{
+				"name": "test",
+				"packageManager": "yarn@1.22.19"
+			}`,
+			wantPM: Yarn,
+		},
+		{
+			name: "yarn berry specified in packageManager field",
 			packageJSON: `{
 				"name": "test",
 				"packageManager": "yarn@3.0.0"
 			}`,
-			wantPM: Yarn,
+			wantPM: YarnBerry,
 		},
 		{
 			name: "pnpm specified in packageManager field",

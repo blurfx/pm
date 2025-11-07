@@ -19,7 +19,7 @@ func Execute(pm detector.PackageManager, cmd *translator.Command) error {
 	finalArgs = append(finalArgs, cmd.Args...)
 
 	// Execute the main command
-	err := run(string(pm), finalArgs...)
+	err := run(pmBinary(pm), finalArgs...)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func Execute(pm detector.PackageManager, cmd *translator.Command) error {
 		case detector.NPM:
 			devCommand = []string{"install"}
 			devFlag = []string{"--save-dev"}
-		case detector.Yarn:
+		case detector.Yarn, detector.YarnBerry:
 			devCommand = []string{"add"}
 			devFlag = []string{"--dev"}
 		case detector.Pnpm:
@@ -73,7 +73,7 @@ func Execute(pm detector.PackageManager, cmd *translator.Command) error {
 		typesArgs := append(devCommand, devFlag...)
 		typesArgs = append(typesArgs, typesToInstall...)
 
-		err = run(string(pm), typesArgs...)
+		err = run(pmBinary(pm), typesArgs...)
 		if err != nil {
 			// Don't fail if @types installation fails
 			fmt.Fprintf(os.Stderr, "Warning: Failed to install @types packages: %v\n", err)
@@ -97,6 +97,14 @@ func RunWithFlags(pm detector.PackageManager, command translator.CommandAlias, f
 			flagArgs[i] = flag[detector.NPM][0]
 		case detector.Yarn:
 			flagArgs[i] = flag[detector.Yarn][0]
+		case detector.YarnBerry:
+			if yarnValues, ok := flag[detector.YarnBerry]; ok {
+				flagArgs[i] = yarnValues[0]
+			} else if classicValues, ok := flag[detector.Yarn]; ok {
+				flagArgs[i] = classicValues[0]
+			} else {
+				return fmt.Errorf("flag not available for yarn berry")
+			}
 		case detector.Pnpm:
 			flagArgs[i] = flag[detector.Pnpm][0]
 		case detector.Bun:
@@ -106,7 +114,7 @@ func RunWithFlags(pm detector.PackageManager, command translator.CommandAlias, f
 		}
 	}
 
-	cmd := exec.Command(string(pm), append(command[pm], append(flagArgs, args...)...)...)
+	cmd := exec.Command(pmBinary(pm), append(command[pm], append(flagArgs, args...)...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -123,4 +131,13 @@ func run(command string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func pmBinary(pm detector.PackageManager) string {
+	switch pm {
+	case detector.YarnBerry:
+		return "yarn"
+	default:
+		return string(pm)
+	}
 }

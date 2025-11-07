@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -30,33 +31,41 @@ func detectPackageManager() (PackageManager, error) {
 	if err != nil {
 		return "", fmt.Errorf("no package manager detected")
 	}
+
+	packageJSONPath := filepath.Join(rootDir, "package.json")
+	packageManagerField := readPackageManagerField(packageJSONPath)
+
 	if fileExists(filepath.Join(rootDir, "package-lock.json")) {
 		return NPM, nil
 	} else if fileExists(filepath.Join(rootDir, "yarn.lock")) {
-		return Yarn, nil
+		return detectYarnVariant(rootDir, packageManagerField), nil
 	} else if fileExists(filepath.Join(rootDir, "pnpm-lock.yaml")) {
 		return Pnpm, nil
 	} else if fileExists(filepath.Join(rootDir, "bun.lock")) || fileExists(filepath.Join(currentDir, "bun.lockb")) {
 		return Bun, nil
 	}
 
-	packageJSONPath, err := FindPackageJSON()
-	if err != nil {
-		return "", fmt.Errorf("no package manager detected")
-	}
-
-	file, err := os.Open(packageJSONPath)
-	if err == nil {
-		defer file.Close()
-		var packageJSON packageJSONConfig
-		decoder := json.NewDecoder(file)
-		err = decoder.Decode(&packageJSON)
-		if err == nil && packageJSON.PackageManager != "" {
-			return PackageManager(strings.Split(packageJSON.PackageManager, "@")[0]), nil
-		}
+	if pm, ok := packageManagerFromField(packageManagerField); ok {
+		return pm, nil
 	}
 
 	return "", fmt.Errorf("no package manager detected")
+}
+
+func readPackageManagerField(packageJSONPath string) string {
+	file, err := os.Open(packageJSONPath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	var packageJSON packageJSONConfig
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&packageJSON); err != nil {
+		return ""
+	}
+
+	return packageJSON.PackageManager
 }
 
 func isCommandAvailable(name string) bool {
@@ -140,4 +149,99 @@ func FindProjectRoot() (string, error) {
 	}
 
 	return "", fmt.Errorf("package.json not found")
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
+func detectYarnVariant(rootDir, packageManagerField string) PackageManager {
+	if pm, ok := packageManagerFromField(packageManagerField); ok {
+		if pm == Yarn || pm == YarnBerry {
+			return pm
+		}
+	}
+
+	if fileExists(filepath.Join(rootDir, ".yarnrc.yml")) || fileExists(filepath.Join(rootDir, ".yarnrc.yaml")) {
+		return YarnBerry
+	}
+	if fileExists(filepath.Join(rootDir, ".pnp.cjs")) || fileExists(filepath.Join(rootDir, ".pnp.mjs")) {
+		return YarnBerry
+	}
+	if dirExists(filepath.Join(rootDir, ".yarn", "releases")) {
+		return YarnBerry
+	}
+	return Yarn
+}
+
+func packageManagerFromField(field string) (PackageManager, bool) {
+	name, version := parsePackageManagerParts(field)
+	switch name {
+	case "":
+		return "", false
+	case "npm":
+		return NPM, true
+	case "yarn":
+		if isYarnBerryVersion(version) {
+			return YarnBerry, true
+		}
+		return Yarn, true
+	case "pnpm":
+		return Pnpm, true
+	case "bun":
+		return Bun, true
+	default:
+		return PackageManager(name), true
+	}
+}
+
+func parsePackageManagerParts(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+
+	parts := strings.SplitN(value, "@", 2)
+	name := strings.TrimSpace(parts[0])
+	version := ""
+	if len(parts) == 2 {
+		version = strings.TrimSpace(parts[1])
+	}
+
+	return name, version
+}
+
+func isYarnBerryVersion(version string) bool {
+	major, ok := parseSemverMajor(version)
+	if !ok {
+		return false
+	}
+	return major >= 2
+}
+
+func parseSemverMajor(version string) (int, bool) {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return 0, false
+	}
+
+	version = strings.TrimPrefix(version, "v")
+	end := 0
+	for end < len(version) && version[end] >= '0' && version[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return 0, false
+	}
+
+	major, err := strconv.Atoi(version[:end])
+	if err != nil {
+		return 0, false
+	}
+
+	return major, true
 }

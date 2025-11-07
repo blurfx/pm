@@ -1,9 +1,10 @@
 package translator
 
 import (
-	"pm/internal/detector"
 	"strings"
 	"testing"
+
+	"pm/internal/detector"
 )
 
 func TestTranslator(t *testing.T) {
@@ -53,6 +54,12 @@ func TestTranslator(t *testing.T) {
 			expected:       "install --frozen-lockfile",
 		},
 		{
+			name:           "yarn berry ci",
+			packageManager: detector.YarnBerry,
+			input:          []string{"ci"},
+			expected:       "install --immutable",
+		},
+		{
 			name:           "pnpm ci",
 			packageManager: detector.Pnpm,
 			input:          []string{"ci"},
@@ -77,6 +84,12 @@ func TestTranslator(t *testing.T) {
 		{
 			name:           "yarn add",
 			packageManager: detector.Yarn,
+			input:          []string{"add", "express", "react"},
+			expected:       "add express react",
+		},
+		{
+			name:           "yarn berry add",
+			packageManager: detector.YarnBerry,
 			input:          []string{"add", "express", "react"},
 			expected:       "add express react",
 		},
@@ -222,6 +235,12 @@ func TestTranslatorFlagTranslation(t *testing.T) {
 			wantContains:   "--dev",
 		},
 		{
+			name:           "yarn berry dev flag with -D",
+			packageManager: detector.YarnBerry,
+			input:          []string{"add", "jest", "-D"},
+			wantContains:   "--dev",
+		},
+		{
 			name:           "npm exact flag with -E",
 			packageManager: detector.NPM,
 			input:          []string{"add", "react", "-E"},
@@ -279,6 +298,12 @@ func TestBuiltInCommand(t *testing.T) {
 		{
 			name:           "yarn add is built-in",
 			packageManager: detector.Yarn,
+			command:        "add",
+			isBuiltIn:      true,
+		},
+		{
+			name:           "yarn berry add is built-in",
+			packageManager: detector.YarnBerry,
 			command:        "add",
 			isBuiltIn:      true,
 		},

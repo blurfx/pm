@@ -67,7 +67,7 @@ func (t *Translator) translateInstall(args []string) *Command {
 	switch t.packageManager {
 	case detector.NPM:
 		command = []string{"install"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		command = []string{"install"}
 	case detector.Pnpm:
 		command = []string{"install"}
@@ -91,7 +91,7 @@ func (t *Translator) translateAdd(args []string) *Command {
 	switch t.packageManager {
 	case detector.NPM:
 		command = []string{"install"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		command = []string{"add"}
 	case detector.Pnpm:
 		command = []string{"add"}
@@ -115,7 +115,7 @@ func (t *Translator) translateUninstall(args []string) *Command {
 	switch t.packageManager {
 	case detector.NPM:
 		command = []string{"uninstall"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		command = []string{"remove"}
 	case detector.Pnpm:
 		command = []string{"remove"}
@@ -139,6 +139,8 @@ func (t *Translator) translateCI(args []string) *Command {
 		command = []string{"ci"}
 	case detector.Yarn:
 		command = []string{"install", "--frozen-lockfile"}
+	case detector.YarnBerry:
+		command = []string{"install", "--immutable"}
 	case detector.Pnpm:
 		command = []string{"install", "--frozen-lockfile"}
 	case detector.Bun:
@@ -248,9 +250,7 @@ func (t *Translator) translateInstallFlags(flags map[string]string) []string {
 	for flag, value := range flags {
 		switch flag {
 		case "frozen-lockfile":
-			if t.packageManager != detector.NPM {
-				translated = append(translated, "--frozen-lockfile")
-			}
+			translated = append(translated, t.translateFrozenLockfileFlag()...)
 		case "omit":
 			translated = append(translated, t.translateOmitFlag(value)...)
 		case "global", "g":
@@ -319,11 +319,23 @@ func (t *Translator) translateUninstallFlags(flags map[string]string) []string {
 	return translated
 }
 
+func (t *Translator) translateFrozenLockfileFlag() []string {
+	switch t.packageManager {
+	case detector.NPM:
+		return []string{}
+	case detector.YarnBerry:
+		return []string{"--immutable"}
+	case detector.Yarn, detector.Pnpm, detector.Bun:
+		return []string{"--frozen-lockfile"}
+	}
+	return []string{}
+}
+
 func (t *Translator) translateDevFlag() []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--save-dev"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		return []string{"--dev"}
 	case detector.Pnpm:
 		return []string{"--save-dev"}
@@ -337,7 +349,7 @@ func (t *Translator) translatePeerFlag() []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--save-peer"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		return []string{"--peer"}
 	case detector.Pnpm:
 		return []string{"--save-peer"}
@@ -351,7 +363,7 @@ func (t *Translator) translateOptionalFlag() []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--save-optional"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		return []string{"--optional"}
 	case detector.Pnpm:
 		return []string{"--save-optional"}
@@ -365,7 +377,7 @@ func (t *Translator) translateExactFlag() []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--save-exact"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		return []string{"--exact"}
 	case detector.Pnpm:
 		return []string{"--save-exact"}
@@ -379,7 +391,7 @@ func (t *Translator) translateGlobalFlag() []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--global"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		return []string{"--global"}
 	case detector.Pnpm:
 		return []string{"--global"}
@@ -393,7 +405,7 @@ func (t *Translator) translateProductionFlag() []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--production"}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		return []string{"--production"}
 	case detector.Pnpm:
 		return []string{"--prod"}
@@ -407,7 +419,7 @@ func (t *Translator) translateOmitFlag(value string) []string {
 	switch t.packageManager {
 	case detector.NPM:
 		return []string{"--omit", value}
-	case detector.Yarn:
+	case detector.Yarn, detector.YarnBerry:
 		if value == "dev" {
 			return []string{"--production"}
 		}
